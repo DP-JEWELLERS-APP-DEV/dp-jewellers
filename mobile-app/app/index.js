@@ -23,18 +23,9 @@ const SplashScreen = () => {
             <MyStatusBar />
             <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
                 {appIcon()}
-                {appName()}
             </View>
         </View>
     )
-
-    function appName() {
-        return (
-            <Text style={{ ...Fonts.blackColor26AryaRegular }}>
-                JEWELRY EMPIRE
-            </Text>
-        )
-    }
 
     function appIcon() {
         return (
