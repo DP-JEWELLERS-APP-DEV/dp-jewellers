@@ -39,8 +39,8 @@ const SplashScreen = () => {
     function appIcon() {
         return (
             <Image
-                source={require('../assets/images/appIcon.png')}
-                style={{ width: Screen.width / 4.5, height: Screen.width / 4.5, resizeMode: 'contain' }}
+                source={require('../assets/images/dp-logo-01.png')}
+                style={{ width: Screen.width / 2.2, height: Screen.width / 2.2, resizeMode: 'contain' }}
             />
         )
     }
