@@ -1,16 +1,16 @@
 import { Dimensions } from 'react-native'
 
 export const Colors = {
-    primaryColor: '#FF7A00',
-    whiteColor: '#ffffff',
-    offWhiteColor: '#EBF0FF',
-    blackColor: '#000000',
-    grayColor: '#949494',
-    lightGrayColor: '#C4C4C4',
+    primaryColor: '#0B1F5A',
+    whiteColor: '#FFFDF4',
+    offWhiteColor: '#F4EEDC',
+    blackColor: '#1C1F32',
+    grayColor: '#8C8577',
+    lightGrayColor: '#C9C1B1',
     greenColor: '#009688',
     blueColor: '#00A7F7',
     redColor: '#DD5A5A',
-    lightNavyBlueColor: '#4267B2',
+    lightNavyBlueColor: '#1C2F73',
 }
 
 export const Sizes = {
