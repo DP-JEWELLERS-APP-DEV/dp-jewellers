@@ -257,14 +257,74 @@ exports.listProducts = onCall({ region: "asia-south1" }, async (request) => {
 });
 
 /**
- * Calculate pricing based on current metal rates
+ * Resolve making/wastage charge for a product.
+ * Priority: product-level override > category override > global default
+ */
+function resolveMakingCharge(product, makingChargesConfig) {
+  const pricing = product.pricing || {};
+  const category = product.category || "";
+
+  // 1. Product-level override
+  if (pricing.makingChargeValue && pricing.makingChargeValue > 0) {
+    return {
+      mcType: pricing.makingChargeType || "percentage",
+      mcValue: pricing.makingChargeValue,
+    };
+  }
+
+  // 2. Category-specific override
+  const charges = makingChargesConfig.charges || [];
+  const categoryOverride = charges.find(
+    (c) => c.jewelryType && c.jewelryType.toLowerCase() === category.toLowerCase()
+  );
+
+  if (categoryOverride) {
+    return {
+      mcType: categoryOverride.chargeType || "percentage",
+      mcValue: categoryOverride.value || 0,
+    };
+  }
+
+  // 3. Global default
+  const globalDefault = makingChargesConfig.globalDefault || {};
+  return {
+    mcType: globalDefault.chargeType || "percentage",
+    mcValue: globalDefault.value || 0,
+  };
+}
+
+function resolveWastageCharge(product, makingChargesConfig) {
+  const pricing = product.pricing || {};
+
+  // 1. Product-level override
+  if (pricing.wastageChargeValue && pricing.wastageChargeValue > 0) {
+    return {
+      wcType: pricing.wastageChargeType || "percentage",
+      wcValue: pricing.wastageChargeValue,
+    };
+  }
+
+  // 2. Global wastage default
+  const globalWastage = makingChargesConfig.globalWastage || {};
+  return {
+    wcType: globalWastage.chargeType || "percentage",
+    wcValue: globalWastage.value || 0,
+  };
+}
+
+/**
+ * Calculate pricing based on current metal rates and making charges config
  */
 async function calculatePricing(productData) {
-  const ratesDoc = await db.collection("metalRates").doc("current").get();
-  const taxDoc = await db.collection("taxSettings").doc("current").get();
+  const [ratesDoc, taxDoc, makingChargesDoc] = await Promise.all([
+    db.collection("metalRates").doc("current").get(),
+    db.collection("taxSettings").doc("current").get(),
+    db.collection("makingCharges").doc("current").get(),
+  ]);
 
   const rates = ratesDoc.exists ? ratesDoc.data() : {};
   const taxSettings = taxDoc.exists ? taxDoc.data() : { gst: { jewelry: 3 } };
+  const makingChargesConfig = makingChargesDoc.exists ? makingChargesDoc.data() : {};
 
   const metal = productData.metal || {};
   const diamond = productData.diamond || {};
@@ -290,7 +350,6 @@ async function calculatePricing(productData) {
   let diamondRatePerCarat = 0;
 
   if (diamond.hasDiamond && diamond.totalCaratWeight && rates.diamond) {
-    // Map clarity and color to rate key
     const clarityMap = { FL: "IF", IF: "IF", VVS1: "VVS", VVS2: "VVS", VS1: "VS", VS2: "VS", SI1: "SI", SI2: "SI" };
     const colorMap = { D: "DEF", E: "DEF", F: "DEF", G: "GH", H: "GH", I: "IJ", J: "IJ" };
 
@@ -305,13 +364,12 @@ async function calculatePricing(productData) {
   // Calculate gemstone value
   let gemstoneValue = 0;
   if (productData.gemstones && productData.gemstones.length > 0) {
-    gemstoneValue = pricing.gemstoneValue || 0; // Gemstone prices set manually
+    gemstoneValue = pricing.gemstoneValue || 0;
   }
 
-  // Calculate making charges
+  // Making charges: product > category override > global default
+  const { mcType, mcValue } = resolveMakingCharge(productData, makingChargesConfig);
   let makingChargeAmount = 0;
-  const mcType = pricing.makingChargeType || "percentage";
-  const mcValue = pricing.makingChargeValue || 0;
 
   if (mcType === "percentage") {
     makingChargeAmount = metalValue * (mcValue / 100);
@@ -321,10 +379,9 @@ async function calculatePricing(productData) {
     makingChargeAmount = mcValue;
   }
 
-  // Calculate wastage charges
+  // Wastage charges: product > global default
+  const { wcType, wcValue } = resolveWastageCharge(productData, makingChargesConfig);
   let wastageChargeAmount = 0;
-  const wcType = pricing.wastageChargeType || "percentage";
-  const wcValue = pricing.wastageChargeValue || 0;
 
   if (wcType === "percentage") {
     wastageChargeAmount = metalValue * (wcValue / 100);

@@ -42,17 +42,12 @@ export default function Sidebar({ mobileOpen, handleDrawerToggle }) {
   const router = useRouter();
 
   const handleLogout = async () => {
-    // TEMPORARY: Bypass logout (no Firebase auth)
-    // TODO: Uncomment when Firebase is set up
-    /*
     try {
       await signOut(auth);
       router.push('/login');
     } catch (error) {
       console.error('Logout error:', error);
     }
-    */
-    alert('Logout disabled - Firebase authentication not configured yet');
   };
 
   const drawer = (

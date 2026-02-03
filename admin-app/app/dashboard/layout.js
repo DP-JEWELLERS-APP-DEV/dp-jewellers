@@ -16,9 +16,6 @@ export default function DashboardLayout({ children }) {
   const router = useRouter();
 
   useEffect(() => {
-    // TEMPORARY: Bypass authentication for development
-    // TODO: Uncomment this when Firebase is set up
-    /*
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (!user) {
         router.push('/login');
@@ -28,10 +25,6 @@ export default function DashboardLayout({ children }) {
     });
 
     return () => unsubscribe();
-    */
-
-    // Skip auth check for now
-    setLoading(false);
   }, [router]);
 
   const handleDrawerToggle = () => {

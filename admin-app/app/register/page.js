@@ -4,7 +4,9 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { TextField, Button, Paper, Typography, Alert } from '@mui/material';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 import { auth } from '@/lib/firebase';
+import app from '@/lib/firebase';
 import Link from 'next/link';
 
 export default function RegisterPage() {
@@ -13,11 +15,13 @@ export default function RegisterPage() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleRegister = async (e) => {
     e.preventDefault();
     setError('');
+    setSuccess('');
 
     if (password !== confirmPassword) {
       setError('Passwords do not match');
@@ -32,10 +36,32 @@ export default function RegisterPage() {
     setLoading(true);
 
     try {
-      await createUserWithEmailAndPassword(auth, email, password);
-      router.push('/dashboard');
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+
+      // Call setAdminClaims to bootstrap this user as admin
+      // This only works if no admins exist yet (bootstrap mode)
+      // Otherwise, an existing super_admin must add them
+      const functions = getFunctions(app, 'asia-south1');
+      const setAdminClaims = httpsCallable(functions, 'setAdminClaims');
+
+      try {
+        await setAdminClaims({ uid: userCredential.user.uid });
+        setSuccess('Account created and admin access granted. Redirecting...');
+        // Sign out and sign back in to refresh custom claims
+        await auth.signOut();
+        setTimeout(() => router.push('/login'), 1500);
+      } catch (claimErr) {
+        // If bootstrap fails (admins already exist), just show info
+        await auth.signOut();
+        setSuccess('Account created. An existing admin must grant you access. Redirecting to login...');
+        setTimeout(() => router.push('/login'), 2500);
+      }
     } catch (err) {
-      setError(err.message || 'Failed to create account.');
+      if (err.code === 'auth/email-already-in-use') {
+        setError('An account with this email already exists.');
+      } else {
+        setError(err.message || 'Failed to create account.');
+      }
     } finally {
       setLoading(false);
     }
@@ -67,6 +93,12 @@ export default function RegisterPage() {
         {error && (
           <Alert severity="error" className="mb-4">
             {error}
+          </Alert>
+        )}
+
+        {success && (
+          <Alert severity="success" className="mb-4">
+            {success}
           </Alert>
         )}
 

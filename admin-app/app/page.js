@@ -7,9 +7,7 @@ export default function Home() {
   const router = useRouter();
 
   useEffect(() => {
-    // TEMPORARY: Redirect to dashboard (bypass login)
-    // TODO: Change back to '/login' when Firebase is set up
-    router.push('/dashboard');
+    router.push('/login');
   }, [router]);
 
   return (

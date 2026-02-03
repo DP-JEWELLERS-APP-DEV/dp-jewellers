@@ -21,9 +21,13 @@ exports.onMetalRatesUpdate = onDocumentUpdated(
     console.log("Previous rates:", JSON.stringify(previousRates));
     console.log("New rates:", JSON.stringify(newRates));
 
-    // Get tax settings
-    const taxDoc = await db.collection("taxSettings").doc("current").get();
+    // Get tax settings and making charges config
+    const [taxDoc, makingChargesDoc] = await Promise.all([
+      db.collection("taxSettings").doc("current").get(),
+      db.collection("makingCharges").doc("current").get(),
+    ]);
     const taxSettings = taxDoc.exists ? taxDoc.data() : { gst: { jewelry: 3 } };
+    const makingChargesConfig = makingChargesDoc.exists ? makingChargesDoc.data() : {};
 
     // Get all active products
     const productsSnapshot = await db.collection("products")
@@ -47,7 +51,7 @@ exports.onMetalRatesUpdate = onDocumentUpdated(
 
       for (const doc of chunk) {
         const product = doc.data();
-        const newPricing = calculatePrice(product, newRates, taxSettings);
+        const newPricing = calculatePrice(product, newRates, taxSettings, makingChargesConfig);
 
         batch.update(doc.ref, {
           pricing: newPricing,
@@ -78,18 +82,78 @@ exports.calculateProductPrice = onCall({ region: "asia-south1" }, async (request
     throw new HttpsError("failed-precondition", "Metal rates not configured.");
   }
 
-  const taxDoc = await db.collection("taxSettings").doc("current").get();
+  const [taxDoc, makingChargesDoc] = await Promise.all([
+    db.collection("taxSettings").doc("current").get(),
+    db.collection("makingCharges").doc("current").get(),
+  ]);
   const taxSettings = taxDoc.exists ? taxDoc.data() : { gst: { jewelry: 3 } };
+  const makingChargesConfig = makingChargesDoc.exists ? makingChargesDoc.data() : {};
 
-  const pricing = calculatePrice(productData, ratesDoc.data(), taxSettings);
+  const pricing = calculatePrice(productData, ratesDoc.data(), taxSettings, makingChargesConfig);
 
   return pricing;
 });
 
 /**
+ * Resolve making/wastage charge for a product.
+ * Priority: product-level override > category override > global default
+ */
+function resolveMakingCharge(product, makingChargesConfig) {
+  const pricing = product.pricing || {};
+  const category = product.category || "";
+
+  // 1. If product has its own making charge set, use it
+  if (pricing.makingChargeValue && pricing.makingChargeValue > 0) {
+    return {
+      mcType: pricing.makingChargeType || "percentage",
+      mcValue: pricing.makingChargeValue,
+    };
+  }
+
+  // 2. Look for category-specific override in makingCharges collection
+  const charges = makingChargesConfig.charges || [];
+  const categoryOverride = charges.find(
+    (c) => c.jewelryType && c.jewelryType.toLowerCase() === category.toLowerCase()
+  );
+
+  if (categoryOverride) {
+    return {
+      mcType: categoryOverride.chargeType || "percentage",
+      mcValue: categoryOverride.value || 0,
+    };
+  }
+
+  // 3. Fall back to global default
+  const globalDefault = makingChargesConfig.globalDefault || {};
+  return {
+    mcType: globalDefault.chargeType || "percentage",
+    mcValue: globalDefault.value || 0,
+  };
+}
+
+function resolveWastageCharge(product, makingChargesConfig) {
+  const pricing = product.pricing || {};
+
+  // 1. If product has its own wastage charge set, use it
+  if (pricing.wastageChargeValue && pricing.wastageChargeValue > 0) {
+    return {
+      wcType: pricing.wastageChargeType || "percentage",
+      wcValue: pricing.wastageChargeValue,
+    };
+  }
+
+  // 2. Fall back to global wastage default
+  const globalWastage = makingChargesConfig.globalWastage || {};
+  return {
+    wcType: globalWastage.chargeType || "percentage",
+    wcValue: globalWastage.value || 0,
+  };
+}
+
+/**
  * Core price calculation logic
  */
-function calculatePrice(product, rates, taxSettings) {
+function calculatePrice(product, rates, taxSettings, makingChargesConfig = {}) {
   const metal = product.metal || {};
   const diamond = product.diamond || {};
   const pricing = product.pricing || {};
@@ -139,10 +203,9 @@ function calculatePrice(product, rates, taxSettings) {
   // Gemstone value (manually set)
   const gemstoneValue = pricing.gemstoneValue || 0;
 
-  // Making charges
+  // Making charges: category override → global default
+  const { mcType, mcValue } = resolveMakingCharge(product, makingChargesConfig);
   let makingChargeAmount = 0;
-  const mcType = pricing.makingChargeType || "percentage";
-  const mcValue = pricing.makingChargeValue || 0;
 
   if (mcType === "percentage") {
     makingChargeAmount = metalValue * (mcValue / 100);
@@ -152,10 +215,9 @@ function calculatePrice(product, rates, taxSettings) {
     makingChargeAmount = mcValue;
   }
 
-  // Wastage charges
+  // Wastage charges: product override → global default
+  const { wcType, wcValue } = resolveWastageCharge(product, makingChargesConfig);
   let wastageChargeAmount = 0;
-  const wcType = pricing.wastageChargeType || "percentage";
-  const wcValue = pricing.wastageChargeValue || 0;
 
   if (wcType === "percentage") {
     wastageChargeAmount = metalValue * (wcValue / 100);
@@ -170,10 +232,19 @@ function calculatePrice(product, rates, taxSettings) {
     makingChargeAmount + wastageChargeAmount + stoneSettingCharges + designCharges;
 
   const discount = pricing.discount || 0;
-  const taxRate = taxSettings.gst?.jewelry || 3;
-  const taxableAmount = subtotal - discount;
-  const taxAmount = taxableAmount * (taxRate / 100);
-  const finalPrice = Math.round(taxableAmount + taxAmount);
+
+  // Split GST: 3% on gold/diamond/gemstone value, 5% on making/wastage/labour charges
+  const jewelryTaxRate = taxSettings.gst?.jewelry || 3;
+  const makingTaxRate = taxSettings.gst?.makingCharges || 5;
+
+  const jewelryTaxableAmount = metalValue + diamondValue + gemstoneValue;
+  const labourTaxableAmount = makingChargeAmount + wastageChargeAmount + stoneSettingCharges + designCharges;
+
+  const jewelryTaxAmount = jewelryTaxableAmount * (jewelryTaxRate / 100);
+  const labourTaxAmount = labourTaxableAmount * (makingTaxRate / 100);
+  const totalTaxAmount = jewelryTaxAmount + labourTaxAmount;
+
+  const finalPrice = Math.round(subtotal - discount + totalTaxAmount);
 
   return {
     goldRatePerGram: metal.type === "gold" ? ratePerGram : 0,
@@ -192,8 +263,11 @@ function calculatePrice(product, rates, taxSettings) {
     gemstoneValue,
     subtotal: Math.round(subtotal),
     discount,
-    taxRate,
-    taxAmount: Math.round(taxAmount),
+    jewelryTaxRate,
+    makingTaxRate,
+    jewelryTaxAmount: Math.round(jewelryTaxAmount),
+    labourTaxAmount: Math.round(labourTaxAmount),
+    taxAmount: Math.round(totalTaxAmount),
     finalPrice,
     mrp: pricing.mrp || finalPrice,
     sellingPrice: finalPrice,

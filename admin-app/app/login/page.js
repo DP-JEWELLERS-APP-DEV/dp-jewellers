@@ -4,7 +4,8 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { TextField, Button, Paper, Typography, Alert } from '@mui/material';
 import { signInWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
+import { doc, getDoc } from 'firebase/firestore';
+import { auth, db } from '@/lib/firebase';
 import Link from 'next/link';
 
 export default function LoginPage() {
@@ -20,10 +21,25 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+
+      // Verify user is an admin
+      const adminDoc = await getDoc(doc(db, 'admins', userCredential.user.uid));
+      if (!adminDoc.exists() || !adminDoc.data().isActive) {
+        await auth.signOut();
+        setError('Access denied. You are not registered as an admin.');
+        return;
+      }
+
       router.push('/dashboard');
     } catch (err) {
-      setError(err.message || 'Failed to login. Please check your credentials.');
+      if (err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password') {
+        setError('Invalid email or password.');
+      } else if (err.code === 'auth/user-not-found') {
+        setError('No account found with this email.');
+      } else {
+        setError(err.message || 'Failed to login. Please check your credentials.');
+      }
     } finally {
       setLoading(false);
     }
