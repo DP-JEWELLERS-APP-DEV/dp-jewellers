@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View, Modal, ScrollView, TouchableOpacity } from 'react-native'
+import { StyleSheet, Text, View, Modal, ScrollView, TouchableOpacity, Image } from 'react-native'
 import React, { useState } from 'react'
 import { Colors, CommomStyles, Fonts, Screen, Sizes } from '../../constants/styles'
 import { MaterialIcons } from '@expo/vector-icons';
@@ -147,6 +147,7 @@ const VerificationScreen = () => {
     function header() {
         return (
             <View style={{ marginHorizontal: Sizes.fixPadding * 2.0, marginBottom: Sizes.fixPadding * 2.0, }}>
+                <Image source={require('../../assets/images/dp-logo-01.png')} style={CommomStyles.headerLogo} />
                 <Text style={{ ...Fonts.blackColor20SemiBold }}>
                     Verification
                 </Text>

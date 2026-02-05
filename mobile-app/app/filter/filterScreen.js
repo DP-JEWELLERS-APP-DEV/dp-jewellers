@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View, TouchableOpacity, ScrollView } from 'react-native'
+import { StyleSheet, Text, View, TouchableOpacity, ScrollView, Image } from 'react-native'
 import React, { useState, useCallback } from 'react'
 import { Colors, CommomStyles, Fonts, Sizes } from '../../constants/styles'
 import { MaterialIcons } from '@expo/vector-icons';
@@ -137,6 +137,7 @@ const FilterScreen = () => {
     function header() {
         return (
             <View style={CommomStyles.headerStyle}>
+                <Image source={require('../../assets/images/dp-logo-01.png')} style={CommomStyles.headerLogo} />
                 <MaterialIcons name="keyboard-backspace" size={26} color={Colors.blackColor} onPress={() => { navigation.pop() }} />
                 <Text style={{ ...Fonts.blackColor20SemiBold, marginLeft: Sizes.fixPadding * 2.0, }}>
                     Filters

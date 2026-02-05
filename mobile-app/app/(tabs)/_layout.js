@@ -35,6 +35,7 @@ export default function TabLayout() {
     <View style={{ flex: 1 }}>
       <MyStatusBar />
       <Tabs
+        initialRouteName="home/homeScreen"
         screenOptions={{
           headerShown: false,
           tabBarActiveTintColor: Colors.primaryColor,

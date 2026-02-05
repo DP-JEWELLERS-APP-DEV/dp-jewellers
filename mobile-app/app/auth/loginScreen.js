@@ -108,16 +108,10 @@ const LoginScreen = () => {
         return (
             <View style={styles.heroWrap}>
                 <Image
-                    source={require('../../assets/images/jewellery/jewellary1.png')}
+                    source={require('../../assets/images/login-banner.jpg')}
                     style={styles.heroImage}
                 />
-                <TouchableOpacity
-                    activeOpacity={0.7}
-                    onPress={() => { navigation.pop() }}
-                    style={styles.backButton}
-                >
-                    <Feather name="arrow-left" size={20} color={Colors.blackColor} />
-                </TouchableOpacity>
+               
             </View>
         )
     }
@@ -206,22 +200,6 @@ const styles = StyleSheet.create({
         width: '100%',
         height: '100%',
         resizeMode: 'cover',
-    },
-    backButton: {
-        position: 'absolute',
-        top: Sizes.fixPadding * 2.0,
-        left: Sizes.fixPadding * 2.0,
-        width: 34.0,
-        height: 34.0,
-        borderRadius: 17.0,
-        backgroundColor: Colors.whiteColor,
-        alignItems: 'center',
-        justifyContent: 'center',
-        shadowColor: Colors.blackColor,
-        shadowOpacity: 0.08,
-        shadowOffset: { width: 0, height: 4 },
-        shadowRadius: 10,
-        elevation: 3,
     },
     card: {
         marginTop: -Sizes.fixPadding * 3.5,

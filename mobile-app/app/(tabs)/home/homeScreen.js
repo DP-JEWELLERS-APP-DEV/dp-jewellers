@@ -1,6 +1,6 @@
 import { StyleSheet, Text, View, Image, FlatList, TouchableOpacity, ImageBackground, ActivityIndicator } from 'react-native'
 import React, { useEffect, useState } from 'react'
-import { Colors, Fonts, Sizes, Screen } from '../../../constants/styles'
+import { Colors, CommomStyles, Fonts, Sizes, Screen } from '../../../constants/styles'
 import { MaterialCommunityIcons, Feather } from '@expo/vector-icons';
 import { useNavigation } from 'expo-router';
 import { httpsCallable } from 'firebase/functions';
@@ -236,6 +236,7 @@ const HomeScreen = () => {
     function header() {
         return (
             <View style={styles.headerWrapStyle}>
+                <Image source={require('../../../assets/images/dp-logo-01.png')} style={CommomStyles.headerLogo} />
                 <MaterialCommunityIcons name="sort-variant" size={22} color={Colors.blackColor} onPress={() => { }} />
                 <Text
                     numberOfLines={1}

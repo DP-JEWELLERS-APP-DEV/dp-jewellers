@@ -4,7 +4,7 @@ import { Colors, CommomStyles, Fonts, Screen, Sizes } from '../../../constants/s
 import { MaterialIcons, Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation } from 'expo-router';
 import { httpsCallable } from 'firebase/functions';
-import { functions } from '../../../lib/firebase';
+import { auth, functions } from '../../../lib/firebase';
 
 const placeholderImage = require('../../../assets/images/jewellery/jewellary1.png');
 
@@ -16,11 +16,21 @@ const CartScreen = () => {
     const [loading, setloading] = useState(true);
     const [errorText, seterrorText] = useState('');
 
+    const requireAuth = () => {
+        if (!auth?.currentUser) {
+            navigation.push('auth/loginScreen');
+            return false;
+        }
+        return true;
+    };
+
     useEffect(() => {
+        if (!requireAuth()) return;
         fetchCart();
     }, []);
 
     const fetchCart = async () => {
+        if (!requireAuth()) return;
         setloading(true);
         seterrorText('');
         try {
@@ -87,7 +97,10 @@ const CartScreen = () => {
         return (
             <TouchableOpacity
                 activeOpacity={0.8}
-                onPress={() => { navigation.push('selectAddress/selectAddressScreen') }}
+                onPress={() => {
+                    if (!requireAuth()) return;
+                    navigation.push('selectAddress/selectAddressScreen');
+                }}
                 style={{ ...CommomStyles.buttonStyle, marginTop: Sizes.fixPadding * 2.0 }}
             >
                 <Text style={{ ...Fonts.whiteColor19Medium }}>
@@ -133,6 +146,7 @@ const CartScreen = () => {
     }
 
     async function updateQty({ action, productId, size, quantity }) {
+        if (!requireAuth()) return;
         try {
             const updateCart = httpsCallable(functions, 'updateCart');
             await updateCart({
@@ -148,6 +162,7 @@ const CartScreen = () => {
     }
 
     async function removeItem({ productId, size }) {
+        if (!requireAuth()) return;
         try {
             const updateCart = httpsCallable(functions, 'updateCart');
             await updateCart({
@@ -245,6 +260,7 @@ const CartScreen = () => {
     function header() {
         return (
             <View style={{ ...CommomStyles.headerStyle }}>
+                <Image source={require('../../../assets/images/dp-logo-01.png')} style={CommomStyles.headerLogo} />
                 <Text style={{ ...Fonts.blackColor20SemiBold }}>
                     Shopping Cart
                 </Text>

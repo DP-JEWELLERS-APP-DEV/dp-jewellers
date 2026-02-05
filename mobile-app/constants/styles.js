@@ -224,6 +224,12 @@ export const CommomStyles = {
         borderBottomColor: Colors.offWhiteColor,
         borderBottomWidth: 1.0,
     },
+    headerLogo: {
+        width: Screen.width / 6.0,
+        height: Screen.width / 12.0,
+        resizeMode: 'contain',
+        marginRight: Sizes.fixPadding,
+    },
     buttonStyle: {
         backgroundColor: Colors.blackColor,
         marginHorizontal: Sizes.fixPadding * 2.0,

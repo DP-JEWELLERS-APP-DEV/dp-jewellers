@@ -7,7 +7,7 @@ import { Snackbar } from 'react-native-paper';
 import MyStatusBar from '../../components/myStatusBar';
 import { useLocalSearchParams, useNavigation } from 'expo-router';
 import { httpsCallable } from 'firebase/functions';
-import { functions } from '../../lib/firebase';
+import { auth, functions } from '../../lib/firebase';
 
 const fallbackImage = require('../../assets/images/jewellery/jewellary15.png');
 
@@ -247,6 +247,7 @@ const ProductDetailScreen = () => {
     function header() {
         return (
             <View style={styles.headerWrapStyle}>
+                <Image source={require('../../assets/images/dp-logo-01.png')} style={CommomStyles.headerLogo} />
                 <MaterialIcons
                     name="keyboard-backspace"
                     size={26}
@@ -268,6 +269,10 @@ const ProductDetailScreen = () => {
     }
 
     async function handleAddToCart() {
+        if (!auth?.currentUser) {
+            navigation.push('auth/loginScreen');
+            return;
+        }
         try {
             const updateCart = httpsCallable(functions, 'updateCart');
             await updateCart({
@@ -285,6 +290,10 @@ const ProductDetailScreen = () => {
     }
 
     async function toggleFavorite() {
+        if (!auth?.currentUser) {
+            navigation.push('auth/loginScreen');
+            return;
+        }
         try {
             const updateFavorites = httpsCallable(functions, 'updateFavorites');
             const action = isFavorite ? 'remove' : 'add';

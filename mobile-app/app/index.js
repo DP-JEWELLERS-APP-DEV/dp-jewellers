@@ -14,11 +14,12 @@ const SplashScreen = () => {
         let unsubscribe = null;
         const timer = setTimeout(() => {
             unsubscribe = onAuthStateChanged(auth, (user) => {
-                if (user) {
-                    navigation.replace('(tabs)')
-                } else {
-                    navigation.replace('auth/loginScreen')
-                }
+                navigation.replace('(tabs)')
+                // if (user) {
+                //     navigation.replace('(tabs)')
+                // } else {
+                //     navigation.replace('auth/loginScreen')
+                // }
             })
         }, 800);
         return () => {

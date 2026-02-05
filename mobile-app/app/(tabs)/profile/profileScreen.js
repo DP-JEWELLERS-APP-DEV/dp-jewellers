@@ -1,15 +1,19 @@
 import { StyleSheet, Text, View, Image, ScrollView, Modal, TouchableOpacity } from 'react-native'
 import React, { useState } from 'react'
 import { Colors, CommomStyles, Fonts, Screen, Sizes } from '../../../constants/styles'
-import { useNavigation } from 'expo-router'
+import { Redirect, useNavigation, useRouter } from 'expo-router'
 import { signOut } from 'firebase/auth'
 import { auth } from '../../../lib/firebase'
 
 const ProfileScreen = () => {
 
     const navigation = useNavigation();
+    const router = useRouter();
 
     const [showLogoutDialog, setshowLogoutDialog] = useState(false);
+    if (!auth?.currentUser) {
+        return <Redirect href="/auth/loginScreen" />;
+    }
 
     return (
         <View style={{ flex: 1, backgroundColor: Colors.whiteColor }}>
@@ -67,7 +71,7 @@ const ProfileScreen = () => {
                                             try {
                                                 await signOut(auth)
                                             } finally {
-                                                navigation.push('auth/loginScreen')
+                                                router.replace('/home/homeScreen')
                                             }
                                         }}
                                         style={{ ...styles.cancelAndYesButtonStyle, borderTopRightRadius: Sizes.fixPadding, }}
@@ -131,6 +135,7 @@ const ProfileScreen = () => {
     function header() {
         return (
             <View style={{ ...CommomStyles.headerStyle }}>
+                <Image source={require('../../../assets/images/dp-logo-01.png')} style={CommomStyles.headerLogo} />
                 <Text style={{ ...Fonts.blackColor20SemiBold }}>
                     Profile
                 </Text>

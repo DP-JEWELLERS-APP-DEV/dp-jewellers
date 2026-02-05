@@ -5,7 +5,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { Snackbar } from 'react-native-paper';
 import { useNavigation } from 'expo-router';
 import { httpsCallable } from 'firebase/functions';
-import { functions } from '../../../lib/firebase';
+import { auth, functions } from '../../../lib/firebase';
 
 const placeholderImage = require('../../../assets/images/jewellery/jewellary1.png');
 
@@ -18,11 +18,21 @@ const FavoriteScreen = () => {
     const [loading, setloading] = useState(true);
     const [errorText, seterrorText] = useState('');
 
+    const requireAuth = () => {
+        if (!auth?.currentUser) {
+            navigation.push('auth/loginScreen');
+            return false;
+        }
+        return true;
+    };
+
     useEffect(() => {
+        if (!requireAuth()) return;
         fetchFavorites();
     }, []);
 
     const fetchFavorites = async () => {
+        if (!requireAuth()) return;
         setloading(true);
         seterrorText('');
         try {
@@ -86,6 +96,7 @@ const FavoriteScreen = () => {
     }
 
     async function removeFormFavorite({ productId }) {
+        if (!requireAuth()) return;
         try {
             const updateFavorites = httpsCallable(functions, 'updateFavorites');
             await updateFavorites({ action: 'remove', productId });
@@ -140,6 +151,7 @@ const FavoriteScreen = () => {
     function header() {
         return (
             <View style={{ ...CommomStyles.headerStyle }}>
+                <Image source={require('../../../assets/images/dp-logo-01.png')} style={CommomStyles.headerLogo} />
                 <Text style={{ ...Fonts.blackColor20SemiBold }}>
                     Favourite
                 </Text>
