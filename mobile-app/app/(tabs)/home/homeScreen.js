@@ -1,10 +1,12 @@
 import { StyleSheet, Text, View, Image, FlatList, TouchableOpacity, ImageBackground, ActivityIndicator } from 'react-native'
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useCallback } from 'react'
 import { Colors, CommomStyles, Fonts, Sizes, Screen } from '../../../constants/styles'
-import { MaterialCommunityIcons, Feather } from '@expo/vector-icons';
-import { useNavigation } from 'expo-router';
+import { Feather } from '@expo/vector-icons';
+import { useNavigation, useRouter, useFocusEffect } from 'expo-router';
 import { httpsCallable } from 'firebase/functions';
-import { functions } from '../../../lib/firebase';
+import { auth, functions } from '../../../lib/firebase';
+import { Snackbar } from 'react-native-paper';
+import ProductCard from '../../../components/ProductCard';
 
 const bannersList = [
     {
@@ -14,7 +16,7 @@ const bannersList = [
     },
     {
         id: '2',
-        bannerHeader: 'Buy Your Elegant\nJewelry',
+        bannerHeader: 'Exclusive\nCollection',
         bannerImage: require('../../../assets/images/banner/banner.png')
     },
 ];
@@ -24,11 +26,15 @@ const placeholderImage = require('../../../assets/images/jewellery/jewellary1.pn
 const HomeScreen = () => {
 
     const navigation = useNavigation();
+    const router = useRouter();
     const [categories, setcategories] = useState([]);
     const [featured, setfeatured] = useState([]);
     const [popular, setpopular] = useState([]);
     const [loading, setloading] = useState(true);
     const [errorText, seterrorText] = useState('');
+    const [showSnackBar, setShowSnackBar] = useState(false);
+    const [snackText, setSnackText] = useState('');
+    const [favoriteIds, setFavoriteIds] = useState([]);
 
     useEffect(() => {
         let active = true;
@@ -53,6 +59,48 @@ const HomeScreen = () => {
         fetchHomeData();
         return () => { active = false; };
     }, []);
+
+    // Fetch favorites when screen is focused to ensure heart icons are up-to-date
+    useFocusEffect(
+        useCallback(() => {
+            const fetchFavorites = async () => {
+                if (!auth?.currentUser) {
+                    setFavoriteIds([]);
+                    return;
+                }
+                try {
+                    const getFavorites = httpsCallable(functions, 'getFavorites');
+                    const res = await getFavorites();
+                    const favList = res?.data?.favorites || [];
+                    setFavoriteIds(favList.map(f => String(f.productId)));
+                } catch (err) {
+                    // Ignore error
+                }
+            };
+            fetchFavorites();
+        }, [])
+    );
+
+    // Add isFavorite property to products
+    const addFavoriteStatus = (products) => {
+        return products.map(product => ({
+            ...product,
+            isFavorite: favoriteIds.includes(String(product.productId))
+        }));
+    };
+
+    const handleShowSnackBar = (text) => {
+        setSnackText(text);
+        setShowSnackBar(true);
+    };
+
+    const handleFavoriteChange = (isFavorite, productId) => {
+        if (isFavorite) {
+            setFavoriteIds(prev => [...prev, String(productId)]);
+        } else {
+            setFavoriteIds(prev => prev.filter(id => id !== String(productId)));
+        }
+    };
 
     return (
         <View style={{ flex: 1, backgroundColor: Colors.whiteColor }}>
@@ -80,40 +128,43 @@ const HomeScreen = () => {
                     />
                 )}
             </View>
+            {snackBar()}
         </View>
     )
 
-    function popularInfo() {
-        const renderItem = ({ item }) => (
-            <TouchableOpacity
-                activeOpacity={0.5}
-                onPress={() => { navigation.push('productDetail/productDetailScreen', { productId: item.productId }) }}
-                style={{ flex: 1, marginBottom: Sizes.fixPadding * 2.0, ...styles.recommendedAndPopularItemWrapStyle, }}
+    function snackBar() {
+        return (
+            <Snackbar
+                visible={showSnackBar}
+                onDismiss={() => setShowSnackBar(false)}
+                duration={2000}
+                elevation={0.0}
+                style={CommomStyles.snackBarStyle}
             >
-                <Image
-                    source={item.image ? { uri: item.image } : placeholderImage}
-                    style={styles.recommendedAndPopularImageStyle}
-                />
-                <View style={{ backgroundColor: Colors.offWhiteColor, height: 1.0, }} />
-                <View style={{ margin: Sizes.fixPadding + 5.0 }}>
-                    <Text numberOfLines={1} style={{ ...Fonts.blackColor16Regular }}>
-                        {item.name}
-                    </Text>
-                    <Text numberOfLines={1} style={{ ...Fonts.blackColor16SemiBold }}>
-                        {`₹`}{Number(item.finalPrice || 0).toFixed(2)}
-                    </Text>
-                </View>
-            </TouchableOpacity>
+                <Text style={{ ...Fonts.whiteColor16Medium }}>
+                    {snackText}
+                </Text>
+            </Snackbar>
         )
+    }
+
+    function popularInfo() {
+        const productsWithFavorites = addFavoriteStatus(popular);
         return (
             <View style={{ marginTop: Sizes.fixPadding, marginHorizontal: Sizes.fixPadding }}>
                 <Text style={{ marginHorizontal: Sizes.fixPadding, ...Fonts.blackColor18SemiBold, marginBottom: Sizes.fixPadding + 3.0 }}>
                     Popular
                 </Text>
                 <FlatList
-                    data={popular}
+                    data={productsWithFavorites}
                     keyExtractor={(item) => `${item.productId}`}
-                    renderItem={renderItem}
+                    renderItem={({ item }) => (
+                        <ProductCard
+                            item={item}
+                            showSnackBar={handleShowSnackBar}
+                            onFavoriteChange={handleFavoriteChange}
+                        />
+                    )}
                     numColumns={2}
                     scrollEnabled={false}
                 />
@@ -122,36 +173,23 @@ const HomeScreen = () => {
     }
 
     function recommendedInfo() {
-        const renderItem = ({ item }) => (
-            <TouchableOpacity
-                activeOpacity={0.5}
-                onPress={() => { navigation.push('productDetail/productDetailScreen', { productId: item.productId }) }}
-                style={{ ...styles.recommendedAndPopularItemWrapStyle, width: Screen.width / 2.4, }}
-            >
-                <Image
-                    source={item.image ? { uri: item.image } : placeholderImage}
-                    style={styles.recommendedAndPopularImageStyle}
-                />
-                <View style={{ backgroundColor: Colors.offWhiteColor, height: 1.0, }} />
-                <View style={{ margin: Sizes.fixPadding + 5.0 }}>
-                    <Text numberOfLines={1} style={{ ...Fonts.blackColor16Regular }}>
-                        {item.name}
-                    </Text>
-                    <Text numberOfLines={1} style={{ ...Fonts.blackColor16SemiBold }}>
-                        {`₹`}{Number(item.finalPrice || 0).toFixed(2)}
-                    </Text>
-                </View>
-            </TouchableOpacity>
-        )
+        const productsWithFavorites = addFavoriteStatus(featured);
         return (
             <View style={{ marginVertical: Sizes.fixPadding * 2.0, }}>
                 <Text style={{ marginHorizontal: Sizes.fixPadding * 2.0, ...Fonts.blackColor18SemiBold }}>
                     Recommended for You
                 </Text>
                 <FlatList
-                    data={featured}
+                    data={productsWithFavorites}
                     keyExtractor={(item) => `${item.productId}`}
-                    renderItem={renderItem}
+                    renderItem={({ item }) => (
+                        <ProductCard
+                            item={item}
+                            horizontal
+                            showSnackBar={handleShowSnackBar}
+                            onFavoriteChange={handleFavoriteChange}
+                        />
+                    )}
                     horizontal
                     contentContainerStyle={{ paddingHorizontal: Sizes.fixPadding, paddingTop: Sizes.fixPadding + 3.0 }}
                     showsHorizontalScrollIndicator={false}
@@ -209,11 +247,11 @@ const HomeScreen = () => {
                     </Text>
                     <TouchableOpacity
                         activeOpacity={0.8}
-                        onPress={() => { }}
+                        onPress={() => { navigation.navigate('search/searchScreen') }}
                         style={styles.getNowButtonStyle}
                     >
                         <Text style={{ ...Fonts.blackColor15Medium }}>
-                            Get Now
+                            Shop Now
                         </Text>
                     </TouchableOpacity>
                 </View>
@@ -236,15 +274,11 @@ const HomeScreen = () => {
     function header() {
         return (
             <View style={styles.headerWrapStyle}>
-                <Image source={require('../../../assets/images/dp-logo-01.png')} style={CommomStyles.headerLogo} />
-                <MaterialCommunityIcons name="sort-variant" size={22} color={Colors.blackColor} onPress={() => { }} />
-                <Text
-                    numberOfLines={1}
-                    style={styles.headerTextStyle}
-                >
-                    Featured
-                </Text>
-                <Feather name="search" size={19} color={Colors.blackColor} onPress={() => { navigation.navigate('search/searchScreen') }} />
+                <TouchableOpacity onPress={() => router.replace('/(tabs)/home/homeScreen')} activeOpacity={0.7}>
+                    <Image source={require('../../../assets/images/dp-logo-02.png')} style={styles.headerLogo} />
+                </TouchableOpacity>
+                <View style={{ flex: 1 }} />
+                <Feather name="search" size={22} color={Colors.blackColor} onPress={() => { navigation.navigate('search/searchScreen') }} />
             </View>
         )
     }
@@ -253,15 +287,15 @@ const HomeScreen = () => {
 export default HomeScreen
 
 const styles = StyleSheet.create({
-    headerTextStyle: {
-        marginHorizontal: Sizes.fixPadding + 5.0,
-        flex: 1,
-        textAlign: 'center',
-        ...Fonts.blackColor20SemiBold
+    headerLogo: {
+        width: Screen.width / 5.5,
+        height: 35,
+        resizeMode: 'contain',
     },
     headerWrapStyle: {
         flexDirection: 'row',
-        padding: Sizes.fixPadding * 2.0,
+        paddingHorizontal: Sizes.fixPadding * 2.0,
+        paddingVertical: Sizes.fixPadding,
         alignItems: 'center',
         borderBottomColor: Colors.offWhiteColor,
         borderBottomWidth: 1.0
@@ -287,20 +321,6 @@ const styles = StyleSheet.create({
         textAlign: 'center',
         ...Fonts.blackColor16Medium,
         marginTop: Sizes.fixPadding
-    },
-    recommendedAndPopularImageStyle: {
-        alignSelf: 'center',
-        width: Screen.width / 3.5,
-        height: Screen.width / 3.5,
-        resizeMode: 'contain',
-        margin: Sizes.fixPadding + 5.0,
-    },
-    recommendedAndPopularItemWrapStyle: {
-        borderColor: Colors.offWhiteColor,
-        borderWidth: 1.0,
-        borderRadius: Sizes.fixPadding,
-        marginHorizontal: Sizes.fixPadding,
-        maxWidth: (Screen.width / 2.0) - 30
     },
     centerWrap: {
         flex: 1,

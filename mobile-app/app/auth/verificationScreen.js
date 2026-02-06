@@ -147,7 +147,7 @@ const VerificationScreen = () => {
     function header() {
         return (
             <View style={{ marginHorizontal: Sizes.fixPadding * 2.0, marginBottom: Sizes.fixPadding * 2.0, }}>
-                <Image source={require('../../assets/images/dp-logo-01.png')} style={CommomStyles.headerLogo} />
+                <Image source={require('../../assets/images/dp-logo-02.png')} style={CommomStyles.headerLogo} />
                 <Text style={{ ...Fonts.blackColor20SemiBold }}>
                     Verification
                 </Text>

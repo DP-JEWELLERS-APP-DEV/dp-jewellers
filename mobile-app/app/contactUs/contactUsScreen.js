@@ -1,16 +1,72 @@
-import { StyleSheet, Text, View, ScrollView, Image, TextInput, TouchableOpacity, SafeAreaView, StatusBar } from 'react-native'
-import React, { useState } from 'react'
+import { StyleSheet, Text, View, ScrollView, Image, TextInput, TouchableOpacity, SafeAreaView, StatusBar, ActivityIndicator, Alert } from 'react-native'
+import React, { useState, useEffect } from 'react'
 import { Colors, CommomStyles, Fonts, Screen, Sizes } from '../../constants/styles'
 import { MaterialIcons } from '@expo/vector-icons';
-import { useNavigation } from 'expo-router';
+import { useNavigation, useRouter } from 'expo-router';
+import { httpsCallable } from 'firebase/functions';
+import { auth, functions } from '../../lib/firebase';
 
 const ContactUsScreen = () => {
 
     const navigation = useNavigation();
+    const router = useRouter();
 
-    const [fullName, setfullName] = useState('Samantha Smith');
-    const [email, setemail] = useState('samanthasmith@email.com');
+    const [fullName, setfullName] = useState('');
+    const [email, setemail] = useState('');
     const [message, setmessage] = useState('');
+    const [submitting, setSubmitting] = useState(false);
+
+    useEffect(() => {
+        // Pre-fill user data if logged in
+        if (auth?.currentUser) {
+            fetchProfile();
+        }
+    }, []);
+
+    const fetchProfile = async () => {
+        try {
+            const getUserProfile = httpsCallable(functions, 'getUserProfile');
+            const result = await getUserProfile();
+            const data = result.data;
+            setfullName(data?.name || '');
+            setemail(data?.email || '');
+        } catch (err) {
+            // Ignore error, user can fill manually
+        }
+    };
+
+    const handleSubmit = async () => {
+        if (!fullName.trim()) {
+            Alert.alert('Error', 'Please enter your name');
+            return;
+        }
+        if (!email.trim()) {
+            Alert.alert('Error', 'Please enter your email address');
+            return;
+        }
+        if (!message.trim()) {
+            Alert.alert('Error', 'Please enter your message');
+            return;
+        }
+
+        setSubmitting(true);
+        try {
+            const submitContactForm = httpsCallable(functions, 'submitContactForm');
+            await submitContactForm({
+                name: fullName.trim(),
+                email: email.trim(),
+                message: message.trim(),
+            });
+            Alert.alert('Success', 'Your message has been sent. We will get back to you soon.', [
+                { text: 'OK', onPress: () => navigation.pop() }
+            ]);
+        } catch (err) {
+            console.log('Error submitting contact form:', err);
+            Alert.alert('Error', 'Failed to send message. Please try again.');
+        } finally {
+            setSubmitting(false);
+        }
+    };
 
     return (
         <View style={{ flex: 1, backgroundColor: Colors.whiteColor }}>
@@ -34,14 +90,17 @@ const ContactUsScreen = () => {
 
     function backArrow() {
         return (
-            <View style={{ backgroundColor: Colors.blackColor }}>
+            <View style={{ backgroundColor: Colors.blackColor, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Sizes.fixPadding * 2.0, paddingTop: Sizes.fixPadding * 2.0, paddingBottom: Sizes.fixPadding }}>
                 <MaterialIcons
                     name="keyboard-backspace"
                     size={26}
                     color={Colors.whiteColor}
                     onPress={() => { navigation.pop() }}
-                    style={styles.backArrowWrapper}
                 />
+                <TouchableOpacity onPress={() => router.replace('/(tabs)/home/homeScreen')} activeOpacity={0.7}>
+                    <Image source={require('../../assets/images/dp-logo-02.png')} style={[CommomStyles.headerLogo, { tintColor: Colors.whiteColor }]} />
+                </TouchableOpacity>
+                <View style={{ width: 26 }} />
             </View>
         )
     }
@@ -50,12 +109,17 @@ const ContactUsScreen = () => {
         return (
             <TouchableOpacity
                 activeOpacity={0.8}
-                onPress={() => { navigation.pop() }}
-                style={CommomStyles.buttonStyle}
+                onPress={handleSubmit}
+                disabled={submitting}
+                style={[CommomStyles.buttonStyle, submitting && { backgroundColor: Colors.lightGrayColor }]}
             >
-                <Text style={{ ...Fonts.whiteColor19Medium }}>
-                    Submit
-                </Text>
+                {submitting ? (
+                    <ActivityIndicator color={Colors.whiteColor} />
+                ) : (
+                    <Text style={{ ...Fonts.whiteColor19Medium }}>
+                        Submit
+                    </Text>
+                )}
             </TouchableOpacity>
         )
     }
@@ -74,7 +138,7 @@ const ContactUsScreen = () => {
         return (
             <View style={{ marginBottom: Sizes.fixPadding * 1.8 }}>
                 <Text style={{ ...Fonts.grayColor15Regular }}>
-                    Message
+                    Message *
                 </Text>
                 <TextInput
                     placeholder='Write here....'
@@ -83,8 +147,9 @@ const ContactUsScreen = () => {
                     onChangeText={(newVal) => setmessage(newVal)}
                     cursorColor={Colors.primaryColor}
                     selectionColor={Colors.primaryColor}
-                    style={styles.textFieldStyle}
-                    numberOfLines={1}
+                    style={[styles.textFieldStyle, { minHeight: 100, textAlignVertical: 'top' }]}
+                    multiline
+                    numberOfLines={4}
                 />
             </View>
         )
@@ -94,7 +159,7 @@ const ContactUsScreen = () => {
         return (
             <View style={{ marginVertical: Sizes.fixPadding * 2.8 }}>
                 <Text style={{ ...Fonts.grayColor15Regular }}>
-                    Email Address
+                    Email Address *
                 </Text>
                 <TextInput
                     placeholder='Email Address'
@@ -115,7 +180,7 @@ const ContactUsScreen = () => {
         return (
             <View style={{}}>
                 <Text style={{ ...Fonts.grayColor15Regular }}>
-                    Full Name
+                    Full Name *
                 </Text>
                 <TextInput
                     placeholder='Full Name'

@@ -212,8 +212,13 @@ export const Fonts = {
         color: Colors.whiteColor,
         fontSize: 24.0,
         fontFamily: 'Mukta-ExtraBold'
-    }
+    },
 
+    whiteColor12Medium: {
+        color: Colors.whiteColor,
+        fontSize: 12.0,
+        fontFamily: 'Mukta-ExtraBold'
+    }
 }
 
 export const CommomStyles = {

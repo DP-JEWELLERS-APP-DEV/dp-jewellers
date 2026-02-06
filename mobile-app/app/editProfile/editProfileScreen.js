@@ -1,19 +1,77 @@
-import { StyleSheet, Text, View, Modal, TextInput, Image, ScrollView, TouchableOpacity } from 'react-native'
-import React, { useState } from 'react'
+import { StyleSheet, Text, View, Modal, TextInput, Image, ScrollView, TouchableOpacity, ActivityIndicator, Alert } from 'react-native'
+import React, { useState, useEffect } from 'react'
 import { Colors, Fonts, Sizes, CommomStyles, Screen } from '../../constants/styles'
-import { MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { MaterialIcons, MaterialCommunityIcons, Feather } from '@expo/vector-icons';
 import MyStatusBar from '../../components/myStatusBar';
-import { useNavigation } from 'expo-router';
+import { useNavigation, useRouter } from 'expo-router';
+import { httpsCallable } from 'firebase/functions';
+import { auth, functions } from '../../lib/firebase';
 
 const EditProfileScreen = () => {
 
     const navigation = useNavigation();
+    const router = useRouter();
 
-    const [fullName, setfullName] = useState('Samantha Smith');
-    const [email, setemail] = useState('samanthasmith@email.com');
-    const [mobileNumber, setmobileNumber] = useState('+79 147 852 698');
-    const [password, setpassword] = useState('123456789');
+    const [fullName, setfullName] = useState('');
+    const [email, setemail] = useState('');
+    const [mobileNumber, setmobileNumber] = useState('');
+    const [profilePicture, setProfilePicture] = useState('');
     const [showBottomSheet, setShowBottomSheet] = useState(false);
+    const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
+
+    useEffect(() => {
+        fetchProfile();
+    }, []);
+
+    const fetchProfile = async () => {
+        try {
+            const getUserProfile = httpsCallable(functions, 'getUserProfile');
+            const result = await getUserProfile();
+            const data = result.data;
+            setfullName(data?.name || '');
+            setemail(data?.email || '');
+            setmobileNumber(data?.phone || auth?.currentUser?.phoneNumber || '');
+            setProfilePicture(data?.profilePicture || '');
+        } catch (err) {
+            console.log('Error fetching profile:', err);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleUpdate = async () => {
+        if (!fullName.trim()) {
+            Alert.alert('Error', 'Please enter your name');
+            return;
+        }
+
+        setSaving(true);
+        try {
+            const updateUserProfile = httpsCallable(functions, 'updateUserProfile');
+            await updateUserProfile({
+                name: fullName.trim(),
+                phone: mobileNumber.trim(),
+            });
+            Alert.alert('Success', 'Profile updated successfully', [
+                { text: 'OK', onPress: () => navigation.pop() }
+            ]);
+        } catch (err) {
+            console.log('Error updating profile:', err);
+            Alert.alert('Error', 'Failed to update profile. Please try again.');
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    if (loading) {
+        return (
+            <View style={{ flex: 1, backgroundColor: Colors.whiteColor, alignItems: 'center', justifyContent: 'center' }}>
+                <MyStatusBar />
+                <ActivityIndicator color={Colors.primaryColor} />
+            </View>
+        );
+    }
 
     return (
         <View style={{ flex: 1, backgroundColor: Colors.whiteColor }}>
@@ -25,7 +83,6 @@ const EditProfileScreen = () => {
                     {fullNameInfo()}
                     {emailAddressInfo()}
                     {mobileNumberInfo()}
-                    {passwordInfo()}
                 </ScrollView>
             </View>
             {changeProfilePicOptionsSheet()}
@@ -37,40 +94,24 @@ const EditProfileScreen = () => {
         return (
             <TouchableOpacity
                 activeOpacity={0.8}
-                onPress={() => { navigation.pop() }}
-                style={CommomStyles.buttonStyle}
+                onPress={handleUpdate}
+                disabled={saving}
+                style={[CommomStyles.buttonStyle, saving && { backgroundColor: Colors.lightGrayColor }]}
             >
-                <Text style={{ ...Fonts.whiteColor19Medium }}>
-                    Update
-                </Text>
+                {saving ? (
+                    <ActivityIndicator color={Colors.whiteColor} />
+                ) : (
+                    <Text style={{ ...Fonts.whiteColor19Medium }}>
+                        Update
+                    </Text>
+                )}
             </TouchableOpacity>
-        )
-    }
-
-    function passwordInfo() {
-        return (
-            <View style={{ marginHorizontal: Sizes.fixPadding * 2.0, marginVertical: Sizes.fixPadding * 2.8 }}>
-                <Text style={{ ...Fonts.grayColor15Regular }}>
-                    Password
-                </Text>
-                <TextInput
-                    placeholder='Enter Password'
-                    placeholderTextColor={Colors.grayColor}
-                    value={password}
-                    onChangeText={(newVal) => setpassword(newVal)}
-                    cursorColor={Colors.primaryColor}
-                    selectionColor={Colors.primaryColor}
-                    style={styles.textFieldStyle}
-                    secureTextEntry={true}
-                    numberOfLines={1}
-                />
-            </View>
         )
     }
 
     function mobileNumberInfo() {
         return (
-            <View style={{ marginHorizontal: Sizes.fixPadding * 2.0, }}>
+            <View style={{ marginHorizontal: Sizes.fixPadding * 2.0, marginTop: Sizes.fixPadding * 2.8 }}>
                 <Text style={{ ...Fonts.grayColor15Regular }}>
                     Mobile Number
                 </Text>
@@ -81,19 +122,23 @@ const EditProfileScreen = () => {
                     onChangeText={(newVal) => setmobileNumber(newVal)}
                     cursorColor={Colors.primaryColor}
                     selectionColor={Colors.primaryColor}
-                    style={styles.textFieldStyle}
+                    style={[styles.textFieldStyle, { color: Colors.grayColor }]}
                     keyboardType="phone-pad"
                     numberOfLines={1}
+                    editable={false}
                 />
+                <Text style={{ ...Fonts.grayColor14Regular, marginTop: 4, fontSize: 12 }}>
+                    Phone number cannot be changed
+                </Text>
             </View>
         )
     }
 
     function emailAddressInfo() {
         return (
-            <View style={{ marginHorizontal: Sizes.fixPadding * 2.0, marginVertical: Sizes.fixPadding * 2.8 }}>
+            <View style={{ marginHorizontal: Sizes.fixPadding * 2.0, marginTop: Sizes.fixPadding * 2.8 }}>
                 <Text style={{ ...Fonts.grayColor15Regular }}>
-                    Email Address
+                    Email Address (Optional)
                 </Text>
                 <TextInput
                     placeholder='Enter Email Address'
@@ -114,7 +159,7 @@ const EditProfileScreen = () => {
         return (
             <View style={{ marginHorizontal: Sizes.fixPadding * 2.0, marginTop: Sizes.fixPadding }}>
                 <Text style={{ ...Fonts.grayColor15Regular }}>
-                    Full Name
+                    Full Name *
                 </Text>
                 <TextInput
                     placeholder='Enter Full Name'
@@ -184,10 +229,16 @@ const EditProfileScreen = () => {
     function profilePic() {
         return (
             <View style={{ alignSelf: 'center', margin: Sizes.fixPadding * 2.0 }}>
-                <Image
-                    source={require('../../assets/images/user/user1.png')}
-                    style={{ width: Screen.width / 4.0, height: Screen.width / 4.0, borderRadius: (Screen.width / 4.0) / 2.0, }}
-                />
+                {profilePicture ? (
+                    <Image
+                        source={{ uri: profilePicture }}
+                        style={{ width: Screen.width / 4.0, height: Screen.width / 4.0, borderRadius: (Screen.width / 4.0) / 2.0, }}
+                    />
+                ) : (
+                    <View style={styles.profilePlaceholder}>
+                        <Feather name="user" size={50} color={Colors.lightGrayColor} />
+                    </View>
+                )}
                 <TouchableOpacity
                     activeOpacity={0.8}
                     onPress={() => { setShowBottomSheet(true) }}
@@ -201,12 +252,12 @@ const EditProfileScreen = () => {
 
     function header() {
         return (
-            <View style={CommomStyles.headerStyle}>
-                <Image source={require('../../assets/images/dp-logo-01.png')} style={CommomStyles.headerLogo} />
+            <View style={styles.headerStyle}>
                 <MaterialIcons name="keyboard-backspace" size={26} color={Colors.blackColor} onPress={() => { navigation.pop() }} />
-                <Text numberOfLines={1} style={{ ...Fonts.blackColor20SemiBold, marginLeft: Sizes.fixPadding * 2.0, }}>
-                    Edit Profile
-                </Text>
+                <TouchableOpacity onPress={() => router.replace('/(tabs)/home/homeScreen')} activeOpacity={0.7} style={{ flex: 1, alignItems: 'center' }}>
+                    <Image source={require('../../assets/images/dp-logo-02.png')} style={CommomStyles.headerLogo} />
+                </TouchableOpacity>
+                <View style={{ width: 26 }} />
             </View>
         )
     }
@@ -215,6 +266,14 @@ const EditProfileScreen = () => {
 export default EditProfileScreen
 
 const styles = StyleSheet.create({
+    headerStyle: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: Sizes.fixPadding * 2.0,
+        borderBottomColor: Colors.offWhiteColor,
+        borderBottomWidth: 1.0,
+    },
     changeProfilePicIconWrapStyle: {
         width: Screen.width / 11.0,
         height: Screen.width / 11.0,
@@ -252,5 +311,13 @@ const styles = StyleSheet.create({
         borderBottomWidth: 1.0,
         padding: 0,
         paddingBottom: Sizes.fixPadding,
-    }
+    },
+    profilePlaceholder: {
+        width: Screen.width / 4.0,
+        height: Screen.width / 4.0,
+        borderRadius: (Screen.width / 4.0) / 2.0,
+        backgroundColor: Colors.offWhiteColor,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
 })

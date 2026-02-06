@@ -1,38 +1,41 @@
 import { StyleSheet, Text, View, FlatList, Image, TouchableOpacity, ActivityIndicator } from 'react-native'
 import React, { useEffect, useState } from 'react'
 import { Colors, CommomStyles, Fonts, Screen, Sizes } from '../../../constants/styles'
-import { MaterialIcons } from '@expo/vector-icons';
+import { MaterialIcons, Feather } from '@expo/vector-icons';
 import { Snackbar } from 'react-native-paper';
-import { useNavigation } from 'expo-router';
+import { useNavigation, useRouter } from 'expo-router';
 import { httpsCallable } from 'firebase/functions';
+import { onAuthStateChanged } from 'firebase/auth';
 import { auth, functions } from '../../../lib/firebase';
-
-const placeholderImage = require('../../../assets/images/jewellery/jewellary1.png');
+import ProductCard from '../../../components/ProductCard';
 
 const FavoriteScreen = () => {
 
     const navigation = useNavigation();
+    const router = useRouter();
 
     const [favorites, setfavorites] = useState([]);
     const [showSnackBar, setShowSnackBar] = useState(false);
+    const [snackText, setSnackText] = useState('');
     const [loading, setloading] = useState(true);
     const [errorText, seterrorText] = useState('');
-
-    const requireAuth = () => {
-        if (!auth?.currentUser) {
-            navigation.push('auth/loginScreen');
-            return false;
-        }
-        return true;
-    };
+    const [isAuthenticated, setIsAuthenticated] = useState(null);
 
     useEffect(() => {
-        if (!requireAuth()) return;
-        fetchFavorites();
+        const unsubscribe = onAuthStateChanged(auth, (user) => {
+            if (user) {
+                setIsAuthenticated(true);
+                fetchFavorites();
+            } else {
+                setIsAuthenticated(false);
+                setloading(false);
+            }
+        });
+
+        return () => unsubscribe();
     }, []);
 
     const fetchFavorites = async () => {
-        if (!requireAuth()) return;
         setloading(true);
         seterrorText('');
         try {
@@ -46,6 +49,45 @@ const FavoriteScreen = () => {
             setloading(false);
         }
     };
+
+    const handleShowSnackBar = (text) => {
+        setSnackText(text);
+        setShowSnackBar(true);
+    };
+
+    const handleFavoriteChange = (isFavorite, productId) => {
+        if (!isFavorite) {
+            // Item was removed from favorites, refresh the list
+            fetchFavorites();
+        }
+    };
+
+    // Show login prompt for unauthenticated users
+    if (isAuthenticated === false) {
+        return (
+            <View style={{ flex: 1, backgroundColor: Colors.whiteColor }}>
+                {header()}
+                <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: Sizes.fixPadding * 2 }}>
+                    <MaterialIcons name="favorite-border" size={60} color={Colors.lightGrayColor} />
+                    <Text style={{ ...Fonts.blackColor18SemiBold, marginTop: Sizes.fixPadding * 2.0, textAlign: 'center' }}>
+                        Login to view your wishlist
+                    </Text>
+                    <Text style={{ ...Fonts.grayColor15Regular, marginTop: Sizes.fixPadding - 5, textAlign: 'center' }}>
+                        Sign in to save your favorite items
+                    </Text>
+                    <TouchableOpacity
+                        activeOpacity={0.8}
+                        onPress={() => navigation.push('auth/loginScreen')}
+                        style={styles.loginButton}
+                    >
+                        <Text style={{ ...Fonts.whiteColor19Medium }}>
+                            Login
+                        </Text>
+                    </TouchableOpacity>
+                </View>
+            </View>
+        );
+    }
 
     return (
         <View style={{ flex: 1, backgroundColor: Colors.whiteColor }}>
@@ -74,11 +116,12 @@ const FavoriteScreen = () => {
             <Snackbar
                 visible={showSnackBar}
                 onDismiss={() => { setShowSnackBar(false) }}
+                duration={2000}
                 elevation={0.0}
                 style={CommomStyles.snackBarStyle}
             >
                 <Text style={{ ...Fonts.whiteColor16Medium }}>
-                    Removed From Favorite
+                    {snackText}
                 </Text>
             </Snackbar>
         )
@@ -87,62 +130,37 @@ const FavoriteScreen = () => {
     function noFavoriteItemsInfo() {
         return (
             <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-                <MaterialIcons name="favorite-border" size={26} color={Colors.lightGrayColor} />
+                <MaterialIcons name="favorite-border" size={40} color={Colors.lightGrayColor} />
                 <Text style={{ ...Fonts.lightGrayColor18SemiBold, color: Colors.lightGrayColor, marginTop: Sizes.fixPadding - 5.0 }}>
-                    Nothing in Favorite
+                    Nothing in Wishlist
                 </Text>
+                <TouchableOpacity
+                    activeOpacity={0.8}
+                    onPress={() => router.replace('/(tabs)/home/homeScreen')}
+                    style={[styles.loginButton, { marginTop: Sizes.fixPadding * 2 }]}
+                >
+                    <Text style={{ ...Fonts.whiteColor19Medium }}>
+                        Explore Products
+                    </Text>
+                </TouchableOpacity>
             </View>
         )
     }
 
-    async function removeFormFavorite({ productId }) {
-        if (!requireAuth()) return;
-        try {
-            const updateFavorites = httpsCallable(functions, 'updateFavorites');
-            await updateFavorites({ action: 'remove', productId });
-            await fetchFavorites();
-            setShowSnackBar(true);
-        } catch (err) {
-            seterrorText('Failed to remove favorite.');
-        }
-    }
-
     function favoritesItemsInfo() {
-        const renderItem = ({ item }) => (
-            <TouchableOpacity
-                activeOpacity={0.8}
-                onPress={() => { navigation.push('productDetail/productDetailScreen', { productId: item.productId }) }}
-                style={{ flex: 1, marginBottom: Sizes.fixPadding * 2.0, ...styles.productWrapStyle, }}
-            >
-                <Image
-                    source={item.image ? { uri: item.image } : placeholderImage}
-                    style={styles.productImageStyle}
-                />
-                <MaterialIcons
-                    name="favorite"
-                    size={18}
-                    color={Colors.blackColor}
-                    style={{ position: 'absolute', right: 10.0, top: 10.0 }}
-                    onPress={() => { removeFormFavorite({ productId: item.productId }) }}
-                />
-                <View style={{ backgroundColor: Colors.offWhiteColor, height: 1.0, }} />
-                <View style={{ margin: Sizes.fixPadding + 5.0 }}>
-                    <Text numberOfLines={1} style={{ ...Fonts.blackColor16Regular, lineHeight: 22.0, }}>
-                        {item.name}
-                    </Text>
-                    <Text numberOfLines={1} style={{ ...Fonts.blackColor16SemiBold, lineHeight: 22.0, }}>
-                        {`₹`}{Number(item.finalPrice || 0).toFixed(2)}
-                    </Text>
-                </View>
-            </TouchableOpacity>
-        )
         return (
             <FlatList
-                data={favorites}
+                data={favorites.map(f => ({ ...f, isFavorite: true }))}
                 keyExtractor={(item) => `${item.productId}`}
-                renderItem={renderItem}
+                renderItem={({ item }) => (
+                    <ProductCard
+                        item={item}
+                        showSnackBar={handleShowSnackBar}
+                        onFavoriteChange={handleFavoriteChange}
+                    />
+                )}
                 numColumns={2}
-                contentContainerStyle={{ paddingHorizontal: Sizes.fixPadding, paddingTop: Sizes.fixPadding * 2.0, }}
+                contentContainerStyle={{ paddingHorizontal: Sizes.fixPadding, paddingTop: Sizes.fixPadding * 2.0 }}
                 showsVerticalScrollIndicator={false}
             />
         )
@@ -150,11 +168,14 @@ const FavoriteScreen = () => {
 
     function header() {
         return (
-            <View style={{ ...CommomStyles.headerStyle }}>
-                <Image source={require('../../../assets/images/dp-logo-01.png')} style={CommomStyles.headerLogo} />
-                <Text style={{ ...Fonts.blackColor20SemiBold }}>
-                    Favourite
+            <View style={styles.headerStyle}>
+                <Text style={{ ...Fonts.blackColor18SemiBold, flex: 1 }}>
+                    Wishlist
                 </Text>
+                <TouchableOpacity onPress={() => router.replace('/(tabs)/home/homeScreen')} activeOpacity={0.7}>
+                    <Image source={require('../../../assets/images/dp-logo-02.png')} style={styles.headerLogo} />
+                </TouchableOpacity>
+                <View style={{ flex: 1 }} />
             </View>
         )
     }
@@ -163,19 +184,25 @@ const FavoriteScreen = () => {
 export default FavoriteScreen
 
 const styles = StyleSheet.create({
-    productWrapStyle: {
-        borderColor: Colors.offWhiteColor,
-        borderWidth: 1.0,
-        borderRadius: Sizes.fixPadding,
-        marginHorizontal: Sizes.fixPadding,
-        maxWidth: (Screen.width / 2.0) - 30
+    headerStyle: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: Sizes.fixPadding * 2.0,
+        paddingVertical: Sizes.fixPadding,
+        borderBottomColor: Colors.offWhiteColor,
+        borderBottomWidth: 1.0,
     },
-    productImageStyle: {
-        alignSelf: 'center',
-        width: Screen.width / 3.5,
-        height: Screen.width / 3.5,
+    headerLogo: {
+        width: Screen.width / 6.5,
+        height: 30,
         resizeMode: 'contain',
-        margin: Sizes.fixPadding + 5.0,
+    },
+    loginButton: {
+        backgroundColor: Colors.blackColor,
+        paddingHorizontal: Sizes.fixPadding * 4,
+        paddingVertical: Sizes.fixPadding + 2,
+        borderRadius: Sizes.fixPadding,
+        marginTop: Sizes.fixPadding * 2.5,
     },
     centerWrap: {
         flex: 1,

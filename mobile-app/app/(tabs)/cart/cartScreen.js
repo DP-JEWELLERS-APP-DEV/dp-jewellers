@@ -2,8 +2,9 @@ import { StyleSheet, Text, View, Image, FlatList, TouchableOpacity, ActivityIndi
 import React, { useEffect, useState } from 'react'
 import { Colors, CommomStyles, Fonts, Screen, Sizes } from '../../../constants/styles';
 import { MaterialIcons, Feather, MaterialCommunityIcons } from '@expo/vector-icons';
-import { useNavigation } from 'expo-router';
+import { useNavigation, useRouter } from 'expo-router';
 import { httpsCallable } from 'firebase/functions';
+import { onAuthStateChanged } from 'firebase/auth';
 import { auth, functions } from '../../../lib/firebase';
 
 const placeholderImage = require('../../../assets/images/jewellery/jewellary1.png');
@@ -11,26 +12,28 @@ const placeholderImage = require('../../../assets/images/jewellery/jewellary1.pn
 const CartScreen = () => {
 
     const navigation = useNavigation();
+    const router = useRouter();
 
     const [cart, setcart] = useState([]);
     const [loading, setloading] = useState(true);
     const [errorText, seterrorText] = useState('');
-
-    const requireAuth = () => {
-        if (!auth?.currentUser) {
-            navigation.push('auth/loginScreen');
-            return false;
-        }
-        return true;
-    };
+    const [isAuthenticated, setIsAuthenticated] = useState(null);
 
     useEffect(() => {
-        if (!requireAuth()) return;
-        fetchCart();
+        const unsubscribe = onAuthStateChanged(auth, (user) => {
+            if (user) {
+                setIsAuthenticated(true);
+                fetchCart();
+            } else {
+                setIsAuthenticated(false);
+                setloading(false);
+            }
+        });
+
+        return () => unsubscribe();
     }, []);
 
     const fetchCart = async () => {
-        if (!requireAuth()) return;
         setloading(true);
         seterrorText('');
         try {
@@ -44,6 +47,33 @@ const CartScreen = () => {
             setloading(false);
         }
     };
+
+    // Show login prompt for unauthenticated users
+    if (isAuthenticated === false) {
+        return (
+            <View style={{ flex: 1, backgroundColor: Colors.whiteColor }}>
+                {header()}
+                <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: Sizes.fixPadding * 2 }}>
+                    <MaterialCommunityIcons name="shopping-outline" size={60} color={Colors.lightGrayColor} />
+                    <Text style={{ ...Fonts.blackColor18SemiBold, marginTop: Sizes.fixPadding * 2.0, textAlign: 'center' }}>
+                        Login to view your cart
+                    </Text>
+                    <Text style={{ ...Fonts.grayColor15Regular, marginTop: Sizes.fixPadding - 5, textAlign: 'center' }}>
+                        Sign in to add items to your cart and checkout
+                    </Text>
+                    <TouchableOpacity
+                        activeOpacity={0.8}
+                        onPress={() => navigation.push('auth/loginScreen')}
+                        style={styles.loginButton}
+                    >
+                        <Text style={{ ...Fonts.whiteColor19Medium }}>
+                            Login
+                        </Text>
+                    </TouchableOpacity>
+                </View>
+            </View>
+        );
+    }
 
     return (
         <View style={{ flex: 1, backgroundColor: Colors.whiteColor }}>
@@ -62,7 +92,6 @@ const CartScreen = () => {
                 ) : (
                     cartItems()
                 )}
-
             </View>
         </View>
     )
@@ -70,10 +99,19 @@ const CartScreen = () => {
     function noCartItemsInfo() {
         return (
             <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-                <MaterialCommunityIcons name="shopping-outline" size={26} color={Colors.lightGrayColor} />
+                <MaterialCommunityIcons name="shopping-outline" size={40} color={Colors.lightGrayColor} />
                 <Text style={{ ...Fonts.lightGrayColor18SemiBold, color: Colors.lightGrayColor, marginTop: Sizes.fixPadding - 5.0 }}>
                     Cart is Empty
                 </Text>
+                <TouchableOpacity
+                    activeOpacity={0.8}
+                    onPress={() => router.replace('/(tabs)/home/homeScreen')}
+                    style={[styles.loginButton, { marginTop: Sizes.fixPadding * 2 }]}
+                >
+                    <Text style={{ ...Fonts.whiteColor19Medium }}>
+                        Start Shopping
+                    </Text>
+                </TouchableOpacity>
             </View>
         )
     }
@@ -98,8 +136,7 @@ const CartScreen = () => {
             <TouchableOpacity
                 activeOpacity={0.8}
                 onPress={() => {
-                    if (!requireAuth()) return;
-                    navigation.push('selectAddress/selectAddressScreen');
+                    navigation.push('checkout/deliveryMethodScreen');
                 }}
                 style={{ ...CommomStyles.buttonStyle, marginTop: Sizes.fixPadding * 2.0 }}
             >
@@ -121,7 +158,7 @@ const CartScreen = () => {
                         Sub Total
                     </Text>
                     <Text style={{ textAlign: 'right', ...Fonts.blackColor16Regular, marginTop: Sizes.fixPadding - 5.0 }}>
-                        {`₹`}{subTotal.toFixed(2)}
+                        {`₹ ${subTotal.toLocaleString('en-IN')}`}
                     </Text>
                 </View>
                 <View style={{ flexDirection: 'row', alignItems: 'center', marginHorizontal: Sizes.fixPadding, }}>
@@ -138,15 +175,14 @@ const CartScreen = () => {
                         Total
                     </Text>
                     <Text style={{ textAlign: 'right', ...Fonts.blackColor16SemiBold, }}>
-                        ₹{total.toFixed(2)}
+                        {`₹ ${total.toLocaleString('en-IN')}`}
                     </Text>
                 </View>
             </View>
         )
     }
 
-    async function updateQty({ action, productId, size, quantity }) {
-        if (!requireAuth()) return;
+    async function updateQty({ productId, size, quantity }) {
         try {
             const updateCart = httpsCallable(functions, 'updateCart');
             await updateCart({
@@ -162,7 +198,6 @@ const CartScreen = () => {
     }
 
     async function removeItem({ productId, size }) {
-        if (!requireAuth()) return;
         try {
             const updateCart = httpsCallable(functions, 'updateCart');
             await updateCart({
@@ -192,7 +227,7 @@ const CartScreen = () => {
                                 {item.name}
                             </Text>
                             <Text style={{ ...Fonts.blackColor16Regular }}>
-                                {`₹`}{Number(item.finalPrice || 0).toFixed(2)}
+                                {`₹ ${Number(item.finalPrice || 0).toLocaleString('en-IN')}`}
                             </Text>
                         </View>
                         <Text style={{ ...Fonts.grayColor14Regular, marginTop: -2.0 }}>
@@ -205,7 +240,6 @@ const CartScreen = () => {
                                     onPress={() => {
                                         if (item.quantity > 1) {
                                             updateQty({
-                                                action: 'remove',
                                                 productId: item.productId,
                                                 size: item.size,
                                                 quantity: item.quantity - 1
@@ -223,7 +257,6 @@ const CartScreen = () => {
                                     activeOpacity={0.5}
                                     onPress={() => {
                                         updateQty({
-                                            action: 'add',
                                             productId: item.productId,
                                             size: item.size,
                                             quantity: (item.quantity || 0) + 1
@@ -259,11 +292,14 @@ const CartScreen = () => {
 
     function header() {
         return (
-            <View style={{ ...CommomStyles.headerStyle }}>
-                <Image source={require('../../../assets/images/dp-logo-01.png')} style={CommomStyles.headerLogo} />
-                <Text style={{ ...Fonts.blackColor20SemiBold }}>
+            <View style={styles.headerStyle}>
+                <Text style={{ ...Fonts.blackColor18SemiBold, flex: 1 }}>
                     Shopping Cart
                 </Text>
+                <TouchableOpacity onPress={() => router.replace('/(tabs)/home/homeScreen')} activeOpacity={0.7}>
+                    <Image source={require('../../../assets/images/dp-logo-02.png')} style={styles.headerLogo} />
+                </TouchableOpacity>
+                <View style={{ flex: 1 }} />
             </View>
         )
     }
@@ -272,6 +308,26 @@ const CartScreen = () => {
 export default CartScreen
 
 const styles = StyleSheet.create({
+    headerStyle: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: Sizes.fixPadding * 2.0,
+        paddingVertical: Sizes.fixPadding,
+        borderBottomColor: Colors.offWhiteColor,
+        borderBottomWidth: 1.0,
+    },
+    headerLogo: {
+        width: Screen.width / 6.5,
+        height: 30,
+        resizeMode: 'contain',
+    },
+    loginButton: {
+        backgroundColor: Colors.blackColor,
+        paddingHorizontal: Sizes.fixPadding * 4,
+        paddingVertical: Sizes.fixPadding + 2,
+        borderRadius: Sizes.fixPadding,
+        marginTop: Sizes.fixPadding * 2.5,
+    },
     addRemoveBoxStyle: {
         borderColor: Colors.offWhiteColor,
         borderWidth: 1.0,

@@ -59,6 +59,14 @@
         { "fieldPath": "orderStatus", "order": "ASCENDING" },
         { "fieldPath": "orderedAt", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "stores",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "isActive", "order": "ASCENDING" },
+        { "fieldPath": "name", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

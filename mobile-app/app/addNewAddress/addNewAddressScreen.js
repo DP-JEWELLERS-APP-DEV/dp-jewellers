@@ -1,66 +1,169 @@
-import { StyleSheet, Text, View, TextInput, ScrollView, TouchableOpacity } from 'react-native'
+import { StyleSheet, Text, View, TextInput, ScrollView, TouchableOpacity, ActivityIndicator, Alert } from 'react-native'
 import React, { useState } from 'react'
 import { Colors, Fonts, Sizes, CommomStyles } from '../../constants/styles'
 import { MaterialIcons } from '@expo/vector-icons';
 import SelectDropdown from 'react-native-select-dropdown'
 import MyStatusBar from '../../components/myStatusBar';
-import { useNavigation } from 'expo-router';
+import { useNavigation, useRouter } from 'expo-router';
+import { httpsCallable } from 'firebase/functions';
+import { functions } from '../../lib/firebase';
 
 const addressTypeList = ['Home', 'Office', 'Other'];
 
 const AddNewAddressScreen = () => {
 
     const navigation = useNavigation();
+    const router = useRouter();
 
-    const [areaName, setareaName] = useState('');
-    const [completeAddress, setcompleteAddress] = useState('');
-    const [contactNumber, setcontactNumber] = useState('');
-    const [addressType, setaddressType] = useState('');
+    const [name, setName] = useState('');
+    const [phone, setPhone] = useState('');
+    const [addressLine1, setAddressLine1] = useState('');
+    const [addressLine2, setAddressLine2] = useState('');
+    const [city, setCity] = useState('');
+    const [state, setState] = useState('');
+    const [pincode, setPincode] = useState('');
+    const [addressType, setAddressType] = useState('');
+    const [isDefault, setIsDefault] = useState(false);
+    const [saving, setSaving] = useState(false);
+
+    const validateForm = () => {
+        if (!name.trim()) {
+            Alert.alert('Error', 'Please enter your name');
+            return false;
+        }
+        if (!phone.trim() || phone.length < 10) {
+            Alert.alert('Error', 'Please enter a valid phone number');
+            return false;
+        }
+        if (!addressLine1.trim()) {
+            Alert.alert('Error', 'Please enter your address');
+            return false;
+        }
+        if (!city.trim()) {
+            Alert.alert('Error', 'Please enter your city');
+            return false;
+        }
+        if (!state.trim()) {
+            Alert.alert('Error', 'Please enter your state');
+            return false;
+        }
+        if (!pincode.trim() || pincode.length !== 6) {
+            Alert.alert('Error', 'Please enter a valid 6-digit pincode');
+            return false;
+        }
+        if (!addressType) {
+            Alert.alert('Error', 'Please select address type');
+            return false;
+        }
+        return true;
+    };
+
+    const handleAddAddress = async () => {
+        if (!validateForm()) return;
+
+        setSaving(true);
+        try {
+            const manageAddress = httpsCallable(functions, 'manageAddress');
+            await manageAddress({
+                action: 'add',
+                address: {
+                    addressType: addressType.toLowerCase(),
+                    name: name.trim(),
+                    phone: phone.trim(),
+                    addressLine1: addressLine1.trim(),
+                    addressLine2: addressLine2.trim(),
+                    city: city.trim(),
+                    state: state.trim(),
+                    pincode: pincode.trim(),
+                    isDefault,
+                },
+            });
+
+            Alert.alert('Success', 'Address added successfully', [
+                { text: 'OK', onPress: () => navigation.pop() }
+            ]);
+        } catch (err) {
+            console.log('Error adding address:', err);
+            Alert.alert('Error', err.message || 'Failed to add address. Please try again.');
+        } finally {
+            setSaving(false);
+        }
+    };
 
     return (
         <View style={{ flex: 1, backgroundColor: Colors.whiteColor }}>
             <MyStatusBar />
             <View style={{ flex: 1 }}>
                 {header()}
-                <ScrollView automaticallyAdjustKeyboardInsets={true} showsVerticalScrollIndicator={false}>
-                    {areaNameInfo()}
-                    {completeAddressInfo()}
-                    {contactNumberInfo()}
+                <ScrollView
+                    automaticallyAdjustKeyboardInsets={true}
+                    showsVerticalScrollIndicator={false}
+                    contentContainerStyle={{ paddingBottom: Sizes.fixPadding * 2 }}
+                >
+                    {nameField()}
+                    {phoneField()}
+                    {addressLine1Field()}
+                    {addressLine2Field()}
+                    {cityStateRow()}
+                    {pincodeField()}
                     {addressTypeInfo()}
+                    {defaultAddressToggle()}
                 </ScrollView>
             </View>
             {addButton()}
         </View>
     )
 
+    function defaultAddressToggle() {
+        return (
+            <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={() => setIsDefault(!isDefault)}
+                style={styles.checkboxRow}
+            >
+                <View style={[styles.checkbox, isDefault && styles.checkboxSelected]}>
+                    {isDefault && <MaterialIcons name="check" size={16} color={Colors.whiteColor} />}
+                </View>
+                <Text style={{ ...Fonts.blackColor16Regular, marginLeft: Sizes.fixPadding }}>
+                    Set as default address
+                </Text>
+            </TouchableOpacity>
+        );
+    }
+
     function addButton() {
         return (
             <TouchableOpacity
                 activeOpacity={0.8}
-                onPress={() => { navigation.pop() }}
-                style={CommomStyles.buttonStyle}
+                onPress={handleAddAddress}
+                disabled={saving}
+                style={[CommomStyles.buttonStyle, saving && { backgroundColor: Colors.lightGrayColor }]}
             >
-                <Text style={{ ...Fonts.whiteColor19Medium }}>
-                    Add
-                </Text>
+                {saving ? (
+                    <ActivityIndicator color={Colors.whiteColor} />
+                ) : (
+                    <Text style={{ ...Fonts.whiteColor19Medium }}>
+                        Add Address
+                    </Text>
+                )}
             </TouchableOpacity>
         )
     }
 
     function addressTypeInfo() {
         return (
-            <View style={{ marginHorizontal: Sizes.fixPadding * 2.0, marginVertical: Sizes.fixPadding * 2.8 }}>
+            <View style={{ marginHorizontal: Sizes.fixPadding * 2.0, marginVertical: Sizes.fixPadding * 2.0 }}>
                 <Text style={{ ...Fonts.grayColor15Regular }}>
-                    Address Type
+                    Address Type *
                 </Text>
                 <SelectDropdown
                     data={addressTypeList}
-                    onSelect={(selectedItem, index) => { setaddressType(selectedItem); }}
+                    onSelect={(selectedItem, index) => { setAddressType(selectedItem); }}
                     renderButton={(selectedItem, isOpened) => {
                         return (
                             <View style={styles.dropDownWrapStyle}>
                                 <Text numberOfLines={1} style={{ ...selectedItem ? { ...Fonts.blackColor17Regular } : { ...Fonts.grayColor17Regular }, flex: 1 }}>
-                                    {(selectedItem && selectedItem) || 'Select your address type'}
+                                    {(selectedItem && selectedItem) || 'Select address type'}
                                 </Text>
                                 <MaterialIcons name={isOpened ? 'keyboard-arrow-up' : 'keyboard-arrow-down'} color={Colors.blackColor} size={24} />
                             </View>
@@ -81,62 +184,136 @@ const AddNewAddressScreen = () => {
         )
     }
 
-    function contactNumberInfo() {
+    function pincodeField() {
         return (
-            <View style={{ marginHorizontal: Sizes.fixPadding * 2.0, }}>
+            <View style={{ marginHorizontal: Sizes.fixPadding * 2.0 }}>
                 <Text style={{ ...Fonts.grayColor15Regular }}>
-                    Contact Number
+                    Pincode *
                 </Text>
                 <TextInput
-                    placeholder='Contact Number'
+                    placeholder='Enter 6-digit pincode'
                     placeholderTextColor={Colors.grayColor}
-                    value={contactNumber}
-                    onChangeText={(newVal) => setcontactNumber(newVal)}
+                    value={pincode}
+                    onChangeText={setPincode}
+                    cursorColor={Colors.primaryColor}
+                    selectionColor={Colors.primaryColor}
+                    style={styles.textFieldStyle}
+                    keyboardType="number-pad"
+                    maxLength={6}
+                />
+            </View>
+        )
+    }
+
+    function cityStateRow() {
+        return (
+            <View style={{ flexDirection: 'row', marginHorizontal: Sizes.fixPadding * 2.0, marginVertical: Sizes.fixPadding * 2.0 }}>
+                <View style={{ flex: 1, marginRight: Sizes.fixPadding }}>
+                    <Text style={{ ...Fonts.grayColor15Regular }}>
+                        City *
+                    </Text>
+                    <TextInput
+                        placeholder='City'
+                        placeholderTextColor={Colors.grayColor}
+                        value={city}
+                        onChangeText={setCity}
+                        cursorColor={Colors.primaryColor}
+                        selectionColor={Colors.primaryColor}
+                        style={styles.textFieldStyle}
+                    />
+                </View>
+                <View style={{ flex: 1, marginLeft: Sizes.fixPadding }}>
+                    <Text style={{ ...Fonts.grayColor15Regular }}>
+                        State *
+                    </Text>
+                    <TextInput
+                        placeholder='State'
+                        placeholderTextColor={Colors.grayColor}
+                        value={state}
+                        onChangeText={setState}
+                        cursorColor={Colors.primaryColor}
+                        selectionColor={Colors.primaryColor}
+                        style={styles.textFieldStyle}
+                    />
+                </View>
+            </View>
+        )
+    }
+
+    function addressLine2Field() {
+        return (
+            <View style={{ marginHorizontal: Sizes.fixPadding * 2.0, marginTop: Sizes.fixPadding * 2.0 }}>
+                <Text style={{ ...Fonts.grayColor15Regular }}>
+                    Landmark / Area (Optional)
+                </Text>
+                <TextInput
+                    placeholder='Near landmark or area name'
+                    placeholderTextColor={Colors.grayColor}
+                    value={addressLine2}
+                    onChangeText={setAddressLine2}
+                    cursorColor={Colors.primaryColor}
+                    selectionColor={Colors.primaryColor}
+                    style={styles.textFieldStyle}
+                />
+            </View>
+        )
+    }
+
+    function addressLine1Field() {
+        return (
+            <View style={{ marginHorizontal: Sizes.fixPadding * 2.0, marginTop: Sizes.fixPadding * 2.0 }}>
+                <Text style={{ ...Fonts.grayColor15Regular }}>
+                    Address *
+                </Text>
+                <TextInput
+                    placeholder='House no., Building name, Street'
+                    placeholderTextColor={Colors.grayColor}
+                    value={addressLine1}
+                    onChangeText={setAddressLine1}
+                    cursorColor={Colors.primaryColor}
+                    selectionColor={Colors.primaryColor}
+                    style={styles.textFieldStyle}
+                    multiline
+                />
+            </View>
+        )
+    }
+
+    function phoneField() {
+        return (
+            <View style={{ marginHorizontal: Sizes.fixPadding * 2.0, marginTop: Sizes.fixPadding * 2.0 }}>
+                <Text style={{ ...Fonts.grayColor15Regular }}>
+                    Phone Number *
+                </Text>
+                <TextInput
+                    placeholder='10-digit phone number'
+                    placeholderTextColor={Colors.grayColor}
+                    value={phone}
+                    onChangeText={setPhone}
                     cursorColor={Colors.primaryColor}
                     selectionColor={Colors.primaryColor}
                     style={styles.textFieldStyle}
                     keyboardType="phone-pad"
-                    numberOfLines={1}
+                    maxLength={10}
                 />
             </View>
         )
     }
 
-    function completeAddressInfo() {
-        return (
-            <View style={{ marginHorizontal: Sizes.fixPadding * 2.0, marginVertical: Sizes.fixPadding * 2.8 }}>
-                <Text style={{ ...Fonts.grayColor15Regular }}>
-                    Complete Address
-                </Text>
-                <TextInput
-                    placeholder='Complete Address'
-                    placeholderTextColor={Colors.grayColor}
-                    value={completeAddress}
-                    onChangeText={(newVal) => setcompleteAddress(newVal)}
-                    cursorColor={Colors.primaryColor}
-                    selectionColor={Colors.primaryColor}
-                    style={styles.textFieldStyle}
-                    numberOfLines={1}
-                />
-            </View>
-        )
-    }
-
-    function areaNameInfo() {
+    function nameField() {
         return (
             <View style={{ marginHorizontal: Sizes.fixPadding * 2.0, marginTop: Sizes.fixPadding }}>
                 <Text style={{ ...Fonts.grayColor15Regular }}>
-                    Area Name
+                    Full Name *
                 </Text>
                 <TextInput
-                    placeholder='Area Name'
+                    placeholder='Enter your full name'
                     placeholderTextColor={Colors.grayColor}
-                    value={areaName}
-                    onChangeText={(newVal) => setareaName(newVal)}
+                    value={name}
+                    onChangeText={setName}
                     cursorColor={Colors.primaryColor}
                     selectionColor={Colors.primaryColor}
                     style={styles.textFieldStyle}
-                    numberOfLines={1}
                 />
             </View>
         )
@@ -165,11 +342,30 @@ const styles = StyleSheet.create({
         paddingBottom: Sizes.fixPadding
     },
     dropDownWrapStyle: {
-        borderBottomColor: Colors.blackColor,       
+        borderBottomColor: Colors.blackColor,
         paddingBottom: Sizes.fixPadding,
         borderBottomWidth: 1.0,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between'
-    }
+    },
+    checkboxRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginHorizontal: Sizes.fixPadding * 2.0,
+        marginTop: Sizes.fixPadding,
+    },
+    checkbox: {
+        width: 24,
+        height: 24,
+        borderRadius: 4,
+        borderWidth: 2,
+        borderColor: Colors.lightGrayColor,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    checkboxSelected: {
+        backgroundColor: Colors.blackColor,
+        borderColor: Colors.blackColor,
+    },
 })

@@ -10,16 +10,8 @@ const popularSearches = [
     'Bracelets', 'Charms', 'Rings', 'Body Jewelry', 'Anklets', 'Necklace'
 ];
 
-const recentSearchesList = [
-    {
-        id: '1',
-        search: 'Anklets',
-    },
-    {
-        id: '2',
-        search: 'Bracelets',
-    }
-];
+// No static recent searches - will be populated by user actions
+const recentSearchesList = [];
 
 const placeholderImage = require('../../../assets/images/jewellery/jewellary1.png');
 
@@ -35,22 +27,28 @@ const SearchScreen = () => {
     const [errorText, seterrorText] = useState('');
     const [filters, setfilters] = useState({
         material: '',
+        purity: '',
+        goldColor: '',
+        diamond: '',
         minPrice: '',
         maxPrice: '',
     });
 
     useEffect(() => {
         const material = params?.material ? String(params.material) : '';
+        const purity = params?.purity ? String(params.purity) : '';
+        const goldColor = params?.goldColor ? String(params.goldColor) : '';
+        const diamond = params?.diamond ? String(params.diamond) : '';
         const minPrice = params?.minPrice ? String(params.minPrice) : '';
         const maxPrice = params?.maxPrice ? String(params.maxPrice) : '';
-        setfilters({ material, minPrice, maxPrice });
-    }, [params?.material, params?.minPrice, params?.maxPrice]);
+        setfilters({ material, purity, goldColor, diamond, minPrice, maxPrice });
+    }, [params?.material, params?.purity, params?.goldColor, params?.diamond, params?.minPrice, params?.maxPrice]);
 
     useEffect(() => {
         let active = true;
         const runSearch = async () => {
             const hasQuery = search.trim().length > 0;
-            const hasFilter = Boolean(filters.material || filters.minPrice || filters.maxPrice);
+            const hasFilter = Boolean(filters.material || filters.purity || filters.goldColor || filters.diamond || filters.minPrice || filters.maxPrice);
             if (!hasQuery && !hasFilter) {
                 setresults([]);
                 setloading(false);
@@ -64,6 +62,9 @@ const SearchScreen = () => {
                 const res = await searchProducts({
                     query: search.trim() || undefined,
                     material: filters.material || undefined,
+                    purity: filters.purity || undefined,
+                    goldColor: filters.goldColor || undefined,
+                    diamond: filters.diamond || undefined,
                     minPrice: filters.minPrice ? Number(filters.minPrice) : undefined,
                     maxPrice: filters.maxPrice ? Number(filters.maxPrice) : undefined,
                 });
@@ -81,7 +82,7 @@ const SearchScreen = () => {
         };
         runSearch();
         return () => { active = false; };
-    }, [search, filters.material, filters.minPrice, filters.maxPrice]);
+    }, [search, filters.material, filters.purity, filters.goldColor, filters.diamond, filters.minPrice, filters.maxPrice]);
 
     return (
         <View style={{ flex: 1, backgroundColor: Colors.whiteColor }}>
@@ -243,6 +244,9 @@ const SearchScreen = () => {
                         onPress={() => {
                             navigation.push('filter/filterScreen', {
                                 material: filters.material || '',
+                                purity: filters.purity || '',
+                                goldColor: filters.goldColor || '',
+                                diamond: filters.diamond || '',
                                 minPrice: filters.minPrice || '',
                                 maxPrice: filters.maxPrice || '',
                             })

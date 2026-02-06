@@ -1,12 +1,19 @@
 import { Tabs } from 'expo-router';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
-import { View, StyleSheet, BackHandler, Text, Pressable } from 'react-native'
+import { View, StyleSheet, BackHandler, Text } from 'react-native'
 import { Colors, Sizes, Fonts } from '../../constants/styles';
-import React, { useState, useCallback } from 'react'
+import React, { useState, useCallback, useEffect } from 'react'
 import { useFocusEffect } from '@react-navigation/native';
 import MyStatusBar from '../../components/myStatusBar';
+import { onAuthStateChanged } from 'firebase/auth';
+import { httpsCallable } from 'firebase/functions';
+import { auth, functions } from '../../lib/firebase';
 
 export default function TabLayout() {
+
+  const [backClickCount, setbackClickCount] = useState(0);
+  const [cartCount, setCartCount] = useState(0);
+  const [favoritesCount, setFavoritesCount] = useState(0);
 
   const backAction = () => {
     backClickCount == 1 ? BackHandler.exitApp() : _spring();
@@ -29,7 +36,46 @@ export default function TabLayout() {
     }, 1000)
   }
 
-  const [backClickCount, setbackClickCount] = useState(0);
+  // Fetch cart and favorites counts
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        fetchCounts();
+      } else {
+        setCartCount(0);
+        setFavoritesCount(0);
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  const fetchCounts = async () => {
+    try {
+      // Fetch cart count
+      const getCart = httpsCallable(functions, 'getCart');
+      const cartRes = await getCart();
+      const cartItems = cartRes?.data?.cart || [];
+      setCartCount(cartItems.length);
+
+      // Fetch favorites count
+      const getFavorites = httpsCallable(functions, 'getFavorites');
+      const favRes = await getFavorites();
+      const favItems = favRes?.data?.favorites || [];
+      setFavoritesCount(favItems.length);
+    } catch (err) {
+      // Ignore errors
+    }
+  };
+
+  // Refresh counts when tabs are focused
+  useFocusEffect(
+    useCallback(() => {
+      if (auth?.currentUser) {
+        fetchCounts();
+      }
+    }, [])
+  );
 
   return (
     <View style={{ flex: 1 }}>
@@ -41,36 +87,27 @@ export default function TabLayout() {
           tabBarActiveTintColor: Colors.primaryColor,
           tabBarInactiveTintColor: Colors.blackColor,
           tabBarShowLabel: false,
-          tabBarStyle: { height: 65.0, backgroundColor: Colors.whiteColor, paddingTop: Sizes.fixPadding + 3.0 },
+          tabBarStyle: { height: 60.0, backgroundColor: Colors.whiteColor, paddingTop: Sizes.fixPadding },
           tabBarHideOnKeyboard: true,
-          tabBarButton: (props) => (
-            <Pressable
-              {...props}
-              android_ripple={{ color: Colors.whiteColor }}
-            />
-          )
         }}
       >
+        {/* Home tab - now visible in bottom bar */}
         <Tabs.Screen
           name="home/homeScreen"
           options={{
             tabBarIcon: ({ focused, color }) => (
               <View style={{ alignItems: 'center' }}>
-                <Feather name="home" size={24} color={color} />
+                <Feather name="home" size={22} color={color} />
                 {focused ? <View style={styles.dotStyle} /> : null}
               </View>
             )
           }}
         />
+        {/* Search tab - hidden since search is available at top */}
         <Tabs.Screen
           name="search/searchScreen"
           options={{
-            tabBarIcon: ({ focused, color }) => (
-              <View style={{ alignItems: 'center' }}>
-                <Feather name="search" size={24} color={color} />
-                {focused ? <View style={styles.dotStyle} /> : null}
-              </View>
-            )
+            href: null, // Exclude from tab navigation - search is available at top
           }}
         />
         <Tabs.Screen
@@ -78,7 +115,14 @@ export default function TabLayout() {
           options={{
             tabBarIcon: ({ focused, color }) => (
               <View style={{ alignItems: 'center' }}>
-                <MaterialCommunityIcons name="shopping-outline" size={26} color={color} />
+                <View>
+                  <MaterialCommunityIcons name="shopping-outline" size={24} color={color} />
+                  {cartCount > 0 && (
+                    <View style={styles.badgeStyle}>
+                      <Text style={styles.badgeText}>{cartCount > 9 ? '9+' : cartCount}</Text>
+                    </View>
+                  )}
+                </View>
                 {focused ? <View style={styles.dotStyle} /> : null}
               </View>
             )
@@ -89,7 +133,14 @@ export default function TabLayout() {
           options={{
             tabBarIcon: ({ focused, color }) => (
               <View style={{ alignItems: 'center' }}>
-                <Feather name="heart" size={24} color={color} />
+                <View>
+                  <Feather name="heart" size={22} color={color} />
+                  {favoritesCount > 0 && (
+                    <View style={styles.badgeStyle}>
+                      <Text style={styles.badgeText}>{favoritesCount > 9 ? '9+' : favoritesCount}</Text>
+                    </View>
+                  )}
+                </View>
                 {focused ? <View style={styles.dotStyle} /> : null}
               </View>
             )
@@ -100,11 +151,12 @@ export default function TabLayout() {
           options={{
             tabBarIcon: ({ focused, color }) => (
               <View style={{ alignItems: 'center' }}>
-                <Feather name="user" size={24} color={color} />
+                <Feather name="user" size={22} color={color} />
                 {focused ? <View style={styles.dotStyle} /> : null}
               </View>
             )
-          }} />
+          }}
+        />
       </Tabs>
       {backClickCount == 1 ? exitInfo() : null}
     </View>
@@ -132,10 +184,27 @@ const styles = StyleSheet.create({
   exitWrapStyle: {
     backgroundColor: Colors.blackColor,
     position: "absolute",
-    bottom: 20,
+    bottom: 80,
     alignSelf: 'center',
     borderRadius: Sizes.fixPadding * 2.0,
     paddingHorizontal: Sizes.fixPadding + 5.0,
     paddingVertical: Sizes.fixPadding - 4.0,
+  },
+  badgeStyle: {
+    position: 'absolute',
+    top: -5,
+    right: -8,
+    backgroundColor: Colors.redColor,
+    borderRadius: 10,
+    minWidth: 16,
+    height: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  badgeText: {
+    color: Colors.whiteColor,
+    fontSize: 10,
+    fontWeight: 'bold',
   },
 })
