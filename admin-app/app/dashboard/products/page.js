@@ -58,6 +58,8 @@ const diamondColors = ['D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M'];
 const diamondShapes = ['Round', 'Princess', 'Oval', 'Marquise', 'Pear', 'Cushion', 'Emerald', 'Heart', 'Radiant', 'Asscher'];
 const settingTypes = ['Pave', 'Prong', 'Bezel', 'Channel', 'Tension', 'Flush', 'Halo', 'Cluster', 'Bar', 'Invisible'];
 const sizeCategories = ['Ring', 'Bangle', 'Bracelet', 'Chain', 'Anklet', 'Kada'];
+const diamondQualityBuckets = ['SI_IJ', 'SI_GH', 'VS_GH', 'VVS_EF', 'IF_DEF'];
+const diamondQualityLabels = { SI_IJ: 'SI-IJ', SI_GH: 'SI-GH', VS_GH: 'VS-GH', VVS_EF: 'VVS-EF', IF_DEF: 'IF-DEF' };
 const emptyDiamondVariant = { count: '', shape: '', caratWeight: '', settingType: '', clarity: '', color: '', cut: '' };
 const emptyMetalVariant = { type: '', purity: '', netWeight: '', grossWeight: '', goldOptions: [] };
 
@@ -107,6 +109,14 @@ const emptyForm = {
   huidNumber: '',
   stoneDetails: '',
   status: 'active',
+  // Configurator fields
+  configuratorEnabled: false,
+  availablePurities: {},       // keyed by metal variant index: { 0: ["14K","18K"], 1: ["950"] }
+  defaultPurity: {},           // keyed by metal variant index: { 0: "18K" }
+  availableDiamondQualities: [],
+  defaultDiamondQuality: 'SI_IJ',
+  sizeWeights: [],             // [{ size, weightAdjustment }]
+  defaultSize: '',
 };
 
 export default function ProductsPage() {

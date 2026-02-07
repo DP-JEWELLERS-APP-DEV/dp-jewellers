@@ -1,5 +1,6 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
+const { _calculateVariantPriceInternal } = require("./priceCalculation");
 
 const db = admin.firestore();
 const USERS = "users";
@@ -123,20 +124,51 @@ exports.getCart = onCall({ region: "asia-south1" }, async (request) => {
     return { cart: [], count: 0 };
   }
 
+  // Check if any items have variant selections - if so, we need rates for recalculation
+  const hasVariantItems = cart.some((item) => item.selectedPurity || item.selectedDiamondQuality);
+  let rates = null;
+  let taxSettings = null;
+  let makingChargesConfig = null;
+
+  if (hasVariantItems) {
+    const [ratesDoc, taxDoc, makingChargesDoc] = await Promise.all([
+      db.collection("metalRates").doc("current").get(),
+      db.collection("taxSettings").doc("current").get(),
+      db.collection("makingCharges").doc("current").get(),
+    ]);
+    rates = ratesDoc.exists ? ratesDoc.data() : {};
+    taxSettings = taxDoc.exists ? taxDoc.data() : { gst: { jewelry: 3 } };
+    makingChargesConfig = makingChargesDoc.exists ? makingChargesDoc.data() : {};
+  }
+
   // Fetch product details for each cart item
   const enrichedCart = [];
   for (const item of cart) {
     const productDoc = await db.collection(PRODUCTS).doc(item.productId).get();
     if (productDoc.exists) {
       const product = productDoc.data();
+      let finalPrice = product.pricing?.finalPrice || 0;
+
+      // Recalculate price for variant selections on configurator-enabled products
+      if (item.selectedPurity && product.configurator?.enabled && rates) {
+        const variantPricing = _calculateVariantPriceInternal(
+          product, rates, taxSettings, makingChargesConfig,
+          [item.selectedPurity], item.selectedDiamondQuality, item.size
+        );
+        finalPrice = variantPricing.finalPrice;
+      }
+
       enrichedCart.push({
         productId: item.productId,
         size: item.size,
+        selectedPurity: item.selectedPurity || null,
+        selectedColor: item.selectedColor || null,
+        selectedDiamondQuality: item.selectedDiamondQuality || null,
         quantity: item.quantity,
         addedAt: item.addedAt,
         name: product.name,
         image: product.images?.[0]?.url || "",
-        finalPrice: product.pricing?.finalPrice || 0,
+        finalPrice,
       });
     }
   }
@@ -150,7 +182,7 @@ exports.getCart = onCall({ region: "asia-south1" }, async (request) => {
 exports.updateCart = onCall({ region: "asia-south1" }, async (request) => {
   verifyAuth(request.auth);
 
-  const { action, productId, size, quantity } = request.data;
+  const { action, productId, size, quantity, selectedPurity, selectedColor, selectedDiamondQuality } = request.data;
 
   if (!action) {
     throw new HttpsError("invalid-argument", "action is required.");
@@ -174,6 +206,13 @@ exports.updateCart = onCall({ region: "asia-south1" }, async (request) => {
 
   let cart = userDoc.data().cart || [];
 
+  // Match cart items by productId + size + variant selections
+  const matchCartItem = (item) =>
+    item.productId === productId &&
+    item.size === (size || null) &&
+    (item.selectedPurity || null) === (selectedPurity || null) &&
+    (item.selectedDiamondQuality || null) === (selectedDiamondQuality || null);
+
   switch (action) {
     case "add": {
       // Verify product exists and is active
@@ -182,19 +221,24 @@ exports.updateCart = onCall({ region: "asia-south1" }, async (request) => {
         throw new HttpsError("not-found", "Product not found or unavailable.");
       }
 
-      cart.push({
+      const cartItem = {
         productId,
         size: size || null,
         quantity: quantity || 1,
         addedAt: new Date().toISOString(),
-      });
+      };
+
+      // Store variant selections if provided
+      if (selectedPurity) cartItem.selectedPurity = selectedPurity;
+      if (selectedColor) cartItem.selectedColor = selectedColor;
+      if (selectedDiamondQuality) cartItem.selectedDiamondQuality = selectedDiamondQuality;
+
+      cart.push(cartItem);
       break;
     }
 
     case "update": {
-      const updateIndex = cart.findIndex(
-        (item) => item.productId === productId && item.size === size
-      );
+      const updateIndex = cart.findIndex(matchCartItem);
       if (updateIndex === -1) {
         throw new HttpsError("not-found", "Item not found in cart.");
       }
@@ -203,9 +247,7 @@ exports.updateCart = onCall({ region: "asia-south1" }, async (request) => {
     }
 
     case "remove": {
-      const removeIndex = cart.findIndex(
-        (item) => item.productId === productId && item.size === size
-      );
+      const removeIndex = cart.findIndex(matchCartItem);
       if (removeIndex === -1) {
         throw new HttpsError("not-found", "Item not found in cart.");
       }

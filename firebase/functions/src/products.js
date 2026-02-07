@@ -1,5 +1,6 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
+const { _computePriceRange } = require("./priceCalculation");
 
 const db = admin.firestore();
 const PRODUCTS = "products";
@@ -89,6 +90,7 @@ exports.createProduct = onCall({ region: "asia-south1" }, async (request) => {
     subCategory: data.subCategory || "",
     images: data.images || [],
     metal: data.metal || {},
+    metals: data.metals || [],
     diamond: data.diamond || { hasDiamond: false },
     gemstones: data.gemstones || [],
     dimensions: data.dimensions || {},
@@ -131,6 +133,24 @@ exports.createProduct = onCall({ region: "asia-south1" }, async (request) => {
     purchaseCount: 0,
   };
 
+  // Store configurator if provided
+  if (data.configurator) {
+    product.configurator = data.configurator;
+  }
+
+  // Compute priceRange for configurator-enabled products
+  if (data.configurator?.enabled) {
+    const [ratesDoc, taxDoc, makingChargesDoc] = await Promise.all([
+      db.collection("metalRates").doc("current").get(),
+      db.collection("taxSettings").doc("current").get(),
+      db.collection("makingCharges").doc("current").get(),
+    ]);
+    const rates = ratesDoc.exists ? ratesDoc.data() : {};
+    const taxSettings = taxDoc.exists ? taxDoc.data() : { gst: { jewelry: 3 } };
+    const makingChargesConfig = makingChargesDoc.exists ? makingChargesDoc.data() : {};
+    product.priceRange = _computePriceRange(product, rates, taxSettings, makingChargesConfig);
+  }
+
   const docRef = await db.collection(PRODUCTS).add(product);
 
   return { productId: docRef.id, message: "Product created successfully." };
@@ -166,6 +186,21 @@ exports.updateProduct = onCall({ region: "asia-south1" }, async (request) => {
   // Sync isActive with status if status changed
   if (updateData.status) {
     updateData.isActive = updateData.status === "active" || updateData.status === "coming_soon";
+  }
+
+  // Recompute priceRange if configurator or pricing-related fields changed
+  const finalConfigurator = updateData.configurator || existingData.configurator;
+  if (finalConfigurator?.enabled) {
+    const mergedForRange = { ...existingData, ...updateData, configurator: finalConfigurator };
+    const [ratesDoc, taxDoc, makingChargesDoc] = await Promise.all([
+      db.collection("metalRates").doc("current").get(),
+      db.collection("taxSettings").doc("current").get(),
+      db.collection("makingCharges").doc("current").get(),
+    ]);
+    const rates = ratesDoc.exists ? ratesDoc.data() : {};
+    const taxSettings = taxDoc.exists ? taxDoc.data() : { gst: { jewelry: 3 } };
+    const makingChargesConfig = makingChargesDoc.exists ? makingChargesDoc.data() : {};
+    updateData.priceRange = _computePriceRange(mergedForRange, rates, taxSettings, makingChargesConfig);
   }
 
   updateData.updatedAt = admin.firestore.FieldValue.serverTimestamp();

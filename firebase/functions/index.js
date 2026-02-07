@@ -32,6 +32,7 @@ exports.getMetalRates = metalRates.getMetalRates;
 // ============================================
 exports.onMetalRatesUpdate = priceCalculation.onMetalRatesUpdate;
 exports.calculateProductPrice = priceCalculation.calculateProductPrice;
+exports.calculateVariantPrice = priceCalculation.calculateVariantPrice;
 
 // ============================================
 // ORDER FUNCTIONS
