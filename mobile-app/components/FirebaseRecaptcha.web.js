@@ -3,7 +3,7 @@ import { View } from 'react-native';
 import { RecaptchaVerifier, signInWithPhoneNumber } from 'firebase/auth';
 import { auth } from '../lib/firebase';
 
-const FirebaseRecaptcha = forwardRef(({ firebaseConfig, onVerify, onError }, ref) => {
+const FirebaseRecaptcha = forwardRef(({ firebaseConfig, onVerify, onError, hideUI = false }, ref) => {
   const verifierRef = useRef(null);
 
   useEffect(() => {
@@ -40,7 +40,7 @@ const FirebaseRecaptcha = forwardRef(({ firebaseConfig, onVerify, onError }, ref
     },
   }));
 
-  return <View nativeID="firebase-recaptcha-container" />;
+  return <View nativeID="firebase-recaptcha-container" style={hideUI ? { width: 0, height: 0, opacity: 0 } : undefined} />;
 });
 
 export default FirebaseRecaptcha;

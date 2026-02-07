@@ -174,6 +174,7 @@ const RegisterScreen = () => {
                 <FirebaseRecaptcha
                     ref={recaptchaVerifier}
                     firebaseConfig={firebaseConfig}
+                    hideUI
                 />
                 {heroSection()}
                 {cardSection()}

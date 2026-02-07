@@ -2,7 +2,7 @@ import React, { forwardRef, useImperativeHandle, useRef, useState } from 'react'
 import { Modal, View, StyleSheet, ActivityIndicator } from 'react-native';
 import { WebView } from 'react-native-webview';
 
-const FirebaseRecaptcha = forwardRef(({ firebaseConfig, onVerify, onError }, ref) => {
+const FirebaseRecaptcha = forwardRef(({ firebaseConfig, onVerify, onError, hideUI = false }, ref) => {
   const [visible, setVisible] = useState(false);
   const phoneRef = useRef('');
   const resolveRef = useRef(null);
@@ -120,6 +120,24 @@ const FirebaseRecaptcha = forwardRef(({ firebaseConfig, onVerify, onError }, ref
     ? `https://${firebaseConfig.authDomain}`
     : undefined;
 
+  if (hideUI) {
+    if (!visible) return null;
+    return (
+      <View style={styles.hiddenContainer} pointerEvents="none">
+        <WebView
+          ref={webViewRef}
+          source={{ html, baseUrl }}
+          onMessage={handleMessage}
+          javaScriptEnabled
+          domStorageEnabled
+          startInLoadingState
+          renderLoading={() => null}
+          style={styles.hiddenWebview}
+        />
+      </View>
+    );
+  }
+
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={() => setVisible(false)}>
       <View style={styles.container}>
@@ -163,6 +181,18 @@ const styles = StyleSheet.create({
     left: '50%',
     marginLeft: -20,
     marginTop: -20,
+  },
+  hiddenContainer: {
+    position: 'absolute',
+    width: 1,
+    height: 1,
+    opacity: 0,
+    left: -1000,
+    top: -1000,
+  },
+  hiddenWebview: {
+    width: 1,
+    height: 1,
   },
 });
 

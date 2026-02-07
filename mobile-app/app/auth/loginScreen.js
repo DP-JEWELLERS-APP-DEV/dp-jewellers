@@ -83,6 +83,7 @@ const LoginScreen = () => {
                 <FirebaseRecaptcha
                     ref={recaptchaVerifier}
                     firebaseConfig={firebaseConfig}
+                    hideUI
                 />
                 {cardSection()}
             </ScrollView>
