@@ -156,7 +156,7 @@ export const Fonts = {
 
     blackColor18SemiBold: {
         color: Colors.blackColor,
-        fontSize: 18.0,
+        fontSize: 14.0,
         fontFamily: 'Mukta-SemiBold'
     },
 
@@ -230,8 +230,8 @@ export const CommomStyles = {
         borderBottomWidth: 1.0,
     },
     headerLogo: {
-        width: Screen.width / 4.0,
-        height: Screen.width / 8.0,
+        width: Screen.width / 3.0,
+        height: 55,
         resizeMode: 'contain',
         marginRight: Sizes.fixPadding,
     },

@@ -212,8 +212,8 @@ const styles = StyleSheet.create({
         borderBottomWidth: 1.0,
     },
     headerLogo: {
-        width: Screen.width / 6.5,
-        height: 30,
+        width: Screen.width / 3,
+        height: 55,
         resizeMode: 'contain',
     },
     profileInfoWrapStyle: {

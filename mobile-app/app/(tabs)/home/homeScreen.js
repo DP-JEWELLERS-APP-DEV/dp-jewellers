@@ -302,8 +302,8 @@ export default HomeScreen
 
 const styles = StyleSheet.create({
     headerLogo: {
-        width: Screen.width / 5.5,
-        height: 35,
+        width: Screen.width / 3,
+        height: 55,
         resizeMode: 'contain',
     },
     headerWrapStyle: {
