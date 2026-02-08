@@ -323,9 +323,11 @@ export default function BannersPage() {
                 size="small"
                 label="Banner Title"
                 required
+                multiline
+                rows={2}
                 value={formData.title}
                 onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                helperText="Use \n for line breaks in the banner text"
+                helperText="Press Enter for line breaks"
               />
             </Grid>
             <Grid item xs={12}>
