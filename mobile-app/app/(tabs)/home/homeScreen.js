@@ -8,19 +8,6 @@ import { auth, functions } from '../../../lib/firebase';
 import { Snackbar } from 'react-native-paper';
 import ProductCard from '../../../components/ProductCard';
 
-const bannersList = [
-    {
-        id: '1',
-        bannerHeader: 'Buy Your Elegant\nJewelry',
-        bannerImage: require('../../../assets/images/banner-1.jpg')
-    },
-    {
-        id: '2',
-        bannerHeader: 'Exclusive\nCollection',
-        bannerImage: require('../../../assets/images/banner-2.jpg')
-    },
-];
-
 const placeholderImage = require('../../../assets/images/jewellery/jewellary1.png');
 const categoryImageMap = {
     Ring: require('../../../assets/images/ring.jpg'),
@@ -43,12 +30,14 @@ const HomeScreen = () => {
     const [categories, setcategories] = useState([]);
     const [featured, setfeatured] = useState([]);
     const [popular, setpopular] = useState([]);
+    const [bannerData, setBannerData] = useState([]);
     const [loading, setloading] = useState(true);
     const [errorText, seterrorText] = useState('');
     const [showSnackBar, setShowSnackBar] = useState(false);
     const [snackText, setSnackText] = useState('');
     const [favoriteIds, setFavoriteIds] = useState([]);
-console.log("categories",categories);
+
+    console.log("categories",bannerData);
 
     useEffect(() => {
         let active = true;
@@ -62,6 +51,7 @@ console.log("categories",categories);
                 setcategories(res?.data?.categories || []);
                 setfeatured(res?.data?.featured || []);
                 setpopular(res?.data?.popular || []);
+                setBannerData(res?.data?.banners || []);
             } catch (err) {
                 if (active) {
                     seterrorText('Failed to load home data.');
@@ -269,9 +259,17 @@ console.log("categories",categories);
     }
 
     function banners() {
+        if (!bannerData || bannerData.length === 0) return null;
+        const handleBannerPress = (item) => {
+            if (item.linkType === 'category' && item.linkTarget) {
+                navigation.push('categoryWiseProducts/categoryWiseProductsScreen', { category: item.linkTarget });
+            } else {
+                navigation.navigate('search/searchScreen');
+            }
+        };
         const renderItem = ({ item }) => (
             <ImageBackground
-                source={item.bannerImage}
+                source={{ uri: item.imageUrl }}
                 style={{ width: Screen.width - 60, height: 155.0, marginHorizontal: Sizes.fixPadding, }}
                 borderRadius={Sizes.fixPadding}
             >
@@ -280,11 +278,11 @@ console.log("categories",categories);
                         numberOfLines={2}
                         style={{ ...Fonts.whiteColor22Bold, lineHeight: 26.0, paddingTop: Sizes.fixPadding - 5.0 }}
                     >
-                        {item.bannerHeader}
+                        {item.title}
                     </Text>
                     <TouchableOpacity
                         activeOpacity={0.8}
-                        onPress={() => { navigation.navigate('search/searchScreen') }}
+                        onPress={() => handleBannerPress(item)}
                         style={styles.getNowButtonStyle}
                     >
                         <Text style={{ ...Fonts.blackColor15Medium }}>
@@ -297,7 +295,7 @@ console.log("categories",categories);
         return (
             <View style={{ marginVertical: Sizes.fixPadding * 2.0, }}>
                 <FlatList
-                    data={bannersList}
+                    data={bannerData}
                     keyExtractor={(item) => `${item.id}`}
                     renderItem={renderItem}
                     horizontal

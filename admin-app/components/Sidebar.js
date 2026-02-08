@@ -24,6 +24,7 @@ import {
   AdminPanelSettings,
   Support,
   Store,
+  ViewCarousel,
 } from '@mui/icons-material';
 import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
@@ -35,6 +36,7 @@ const menuItems = [
   { text: 'Pricing', icon: <AttachMoney />, path: '/dashboard/pricing', roles: ['super_admin'], permission: 'manageRates' },
   { text: 'Products', icon: <Inventory />, path: '/dashboard/products', roles: ['super_admin', 'admin', 'editor'], permission: 'manageProducts' },
   { text: 'Orders', icon: <ShoppingCart />, path: '/dashboard/orders', roles: ['super_admin', 'admin'], permission: 'manageOrders' },
+  { text: 'Banners', icon: <ViewCarousel />, path: '/dashboard/banners', roles: ['super_admin', 'admin'], permission: 'managePromotions' },
   { text: 'Stores', icon: <Store />, path: '/dashboard/stores', roles: ['super_admin'] },
   { text: 'Users', icon: <People />, path: '/dashboard/users', roles: ['super_admin'], permission: 'manageUsers' },
   { text: 'Manage Admins', icon: <AdminPanelSettings />, path: '/dashboard/admins', roles: ['super_admin'] },

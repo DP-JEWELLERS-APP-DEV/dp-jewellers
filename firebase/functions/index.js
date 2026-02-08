@@ -86,6 +86,14 @@ exports.getHomePageData = mobileApp.getHomePageData;
 exports.submitContactForm = mobileApp.submitContactForm;
 
 // ============================================
+// BANNER FUNCTIONS
+// ============================================
+const banners = require("./src/banners");
+exports.listBanners = banners.listBanners;
+exports.saveBanner = banners.saveBanner;
+exports.deleteBanner = banners.deleteBanner;
+
+// ============================================
 // STORE FUNCTIONS
 // ============================================
 const stores = require("./src/stores");

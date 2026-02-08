@@ -630,6 +630,7 @@ exports.getHomePageData = onCall({ region: "asia-south1" }, async (_request) => 
   let featured = [];
   let popular = [];
   let categories = [];
+  let banners = [];
 
   try {
     const featuredSnapshot = await db.collection(PRODUCTS)
@@ -696,10 +697,34 @@ exports.getHomePageData = onCall({ region: "asia-south1" }, async (_request) => 
     console.error("getHomePageData: categories query failed", err);
   }
 
+  try {
+    const bannersSnapshot = await db.collection("banners")
+      .where("isActive", "==", true)
+      .get();
+
+    banners = bannersSnapshot.docs
+      .map((doc) => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          title: data.title || "",
+          imageUrl: data.imageUrl || "",
+          linkType: data.linkType || "search",
+          linkTarget: data.linkTarget || "",
+          displayOrder: data.displayOrder || 0,
+        };
+      })
+      .sort((a, b) => a.displayOrder - b.displayOrder)
+      .slice(0, 5);
+  } catch (err) {
+    console.error("getHomePageData: banners query failed", err);
+  }
+
   return {
     categories,
     featured,
     popular,
+    banners,
   };
 });
 
