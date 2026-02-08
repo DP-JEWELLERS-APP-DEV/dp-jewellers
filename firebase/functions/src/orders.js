@@ -49,7 +49,7 @@ exports.createOrder = onCall({ region: "asia-south1" }, async (request) => {
     throw new HttpsError("unauthenticated", "You must be logged in to place an order.");
   }
 
-  const { items, deliveryType, shippingAddress, selectedStore, paymentMethod, couponCode } = request.data;
+  const { items, deliveryType, shippingAddress, selectedStore, paymentMethod, couponCode, partialPayment } = request.data;
 
   if (!items || items.length === 0) {
     throw new HttpsError("invalid-argument", "Order must contain at least one item.");
@@ -148,6 +148,28 @@ exports.createOrder = onCall({ region: "asia-south1" }, async (request) => {
   const shippingCharges = 0; // Free shipping
   const totalAmount = Math.round(subtotal - couponDiscount + shippingCharges);
 
+  // Validate partial payment if provided
+  if (partialPayment && deliveryType === "store_pickup") {
+    const minRequired = Math.ceil(totalAmount * 0.1);
+    if (partialPayment.amountPaid < minRequired) {
+      throw new HttpsError("invalid-argument", `Minimum payment is ₹${minRequired} (10% of order total).`);
+    }
+    if (partialPayment.amountPaid > totalAmount) {
+      throw new HttpsError("invalid-argument", "Payment amount cannot exceed order total.");
+    }
+  }
+
+  // Fetch current metal rates for price locking
+  let metalRatesSnapshot = null;
+  try {
+    const ratesDoc = await db.collection("metalRates").doc("current").get();
+    if (ratesDoc.exists) {
+      metalRatesSnapshot = ratesDoc.data();
+    }
+  } catch (err) {
+    console.log("Warning: Could not fetch metal rates for snapshot:", err.message);
+  }
+
   const orderId = await generateOrderId();
 
   const order = {
@@ -169,6 +191,13 @@ exports.createOrder = onCall({ region: "asia-south1" }, async (request) => {
     paymentStatus: "pending",
     paymentId: "",
     paymentGateway: "",
+    partialPayment: partialPayment && deliveryType === "store_pickup" ? {
+      isPartialPayment: true,
+      amountPaid: partialPayment.amountPaid,
+      amountRemaining: totalAmount - partialPayment.amountPaid,
+    } : null,
+    metalRatesSnapshot: metalRatesSnapshot || null,
+    priceLockDate: admin.firestore.FieldValue.serverTimestamp(),
     orderStatus: "pending",
     trackingUpdates: [
       {

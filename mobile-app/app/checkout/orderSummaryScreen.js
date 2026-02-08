@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View, TouchableOpacity, Image, ScrollView, ActivityIndicator, Alert } from 'react-native'
+import { StyleSheet, Text, View, TouchableOpacity, Image, ScrollView, ActivityIndicator, Alert, TextInput } from 'react-native'
 import React, { useState, useEffect } from 'react'
 import { Colors, Fonts, Sizes, CommomStyles, Screen } from '../../constants/styles'
 import { MaterialIcons, Feather } from '@expo/vector-icons';
@@ -46,12 +46,21 @@ const OrderSummaryScreen = () => {
         ].filter(Boolean);
         return parts.join(', ');
     };
-    const [paymentOption, setPaymentOption] = useState('full'); // 'full' or 'partial' (only for pickup)
+    const [paymentOption, setPaymentOption] = useState('full'); // 'full', 'partial', or 'custom' (only for pickup)
+    const [customAmount, setCustomAmount] = useState('');
 
     const isPickup = deliveryMethod === 'store_pickup';
     const minPayment = Math.ceil(cartTotal * 0.1);
-    const payableAmount = isPickup && paymentOption === 'partial' ? minPayment : cartTotal;
-    const remainingAmount = isPickup && paymentOption === 'partial' ? cartTotal - minPayment : 0;
+
+    const parsedCustomAmount = Number(customAmount) || 0;
+    const isCustomAmountValid = parsedCustomAmount >= minPayment && parsedCustomAmount <= cartTotal;
+
+    const payableAmount = !isPickup || paymentOption === 'full'
+        ? cartTotal
+        : paymentOption === 'partial'
+            ? minPayment
+            : isCustomAmountValid ? parsedCustomAmount : minPayment;
+    const remainingAmount = isPickup && paymentOption !== 'full' ? cartTotal - payableAmount : 0;
 
     useEffect(() => {
         fetchCart();
@@ -70,6 +79,11 @@ const OrderSummaryScreen = () => {
     };
 
     const handlePayment = async () => {
+        if (isPickup && paymentOption === 'custom' && !isCustomAmountValid) {
+            Alert.alert('Invalid Amount', `Please enter an amount between ₹${minPayment.toLocaleString('en-IN')} (10%) and ₹${cartTotal.toLocaleString('en-IN')}.`);
+            return;
+        }
+
         setProcessingPayment(true);
 
         try {
@@ -128,7 +142,7 @@ const OrderSummaryScreen = () => {
                     pickupDate: pickupDate?.toISOString() || null,
                 } : null,
                 paymentMethod: 'online',
-                partialPayment: isPickup && paymentOption === 'partial' ? {
+                partialPayment: isPickup && paymentOption !== 'full' ? {
                     amountPaid: payableAmount,
                     amountRemaining: remainingAmount,
                 } : null,
@@ -212,6 +226,44 @@ const OrderSummaryScreen = () => {
 
                 <TouchableOpacity
                     activeOpacity={0.8}
+                    onPress={() => setPaymentOption('custom')}
+                    style={[styles.paymentOptionCard, paymentOption === 'custom' && styles.paymentOptionSelected]}
+                >
+                    <View style={{ flex: 1 }}>
+                        <Text style={{ ...Fonts.blackColor16Medium }}>Pay Custom Amount</Text>
+                        <Text style={{ ...Fonts.grayColor14Regular, marginTop: 2 }}>
+                            Pay any amount (min 10% i.e. ₹{minPayment.toLocaleString('en-IN')})
+                        </Text>
+                        {paymentOption === 'custom' && (
+                            <View style={styles.customAmountWrap}>
+                                <Text style={{ ...Fonts.blackColor16Medium, marginRight: 4 }}>₹</Text>
+                                <TextInput
+                                    placeholder={`Min ₹${minPayment.toLocaleString('en-IN')}`}
+                                    placeholderTextColor={Colors.grayColor}
+                                    value={customAmount}
+                                    onChangeText={(text) => setCustomAmount(text.replace(/[^0-9]/g, ''))}
+                                    keyboardType="number-pad"
+                                    cursorColor={Colors.primaryColor}
+                                    selectionColor={Colors.primaryColor}
+                                    style={styles.customAmountInput}
+                                />
+                            </View>
+                        )}
+                        {paymentOption === 'custom' && customAmount !== '' && !isCustomAmountValid && (
+                            <Text style={{ ...Fonts.grayColor14Regular, color: Colors.redColor, marginTop: 4 }}>
+                                {parsedCustomAmount < minPayment
+                                    ? `Minimum amount is ₹${minPayment.toLocaleString('en-IN')} (10%)`
+                                    : `Maximum amount is ₹${cartTotal.toLocaleString('en-IN')}`}
+                            </Text>
+                        )}
+                    </View>
+                    <View style={[styles.radioOuter, paymentOption === 'custom' && styles.radioOuterSelected]}>
+                        {paymentOption === 'custom' && <View style={styles.radioInner} />}
+                    </View>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                    activeOpacity={0.8}
                     onPress={() => setPaymentOption('full')}
                     style={[styles.paymentOptionCard, paymentOption === 'full' && styles.paymentOptionSelected]}
                 >
@@ -244,11 +296,13 @@ const OrderSummaryScreen = () => {
                         <Text style={{ ...Fonts.grayColor14Regular }}>Delivery</Text>
                         <Text style={{ ...Fonts.blackColor16Regular, color: Colors.greenColor }}>Free</Text>
                     </View>
-                    {isPickup && paymentOption === 'partial' && (
+                    {isPickup && paymentOption !== 'full' && (
                         <>
                             <View style={styles.dashedLine} />
                             <View style={styles.priceRow}>
-                                <Text style={{ ...Fonts.blackColor14SemiBold }}>Pay Now (10%)</Text>
+                                <Text style={{ ...Fonts.blackColor14SemiBold }}>
+                                    {paymentOption === 'partial' ? 'Pay Now (10%)' : 'Pay Now'}
+                                </Text>
                                 <Text style={{ ...Fonts.blackColor16SemiBold }}>{`₹ ${payableAmount.toLocaleString('en-IN')}`}</Text>
                             </View>
                             <View style={styles.priceRow}>
@@ -351,12 +405,13 @@ const OrderSummaryScreen = () => {
     }
 
     function payButton() {
+        const isPayDisabled = processingPayment || (isPickup && paymentOption === 'custom' && !isCustomAmountValid);
         return (
             <TouchableOpacity
                 activeOpacity={0.8}
                 onPress={handlePayment}
-                disabled={processingPayment}
-                style={[CommomStyles.buttonStyle, processingPayment && { backgroundColor: Colors.lightGrayColor }]}
+                disabled={isPayDisabled}
+                style={[CommomStyles.buttonStyle, isPayDisabled && { backgroundColor: Colors.lightGrayColor }]}
             >
                 {processingPayment ? (
                     <ActivityIndicator color={Colors.whiteColor} />
@@ -452,6 +507,19 @@ const styles = StyleSheet.create({
         height: 12,
         borderRadius: 6,
         backgroundColor: Colors.blackColor,
+    },
+    customAmountWrap: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginTop: Sizes.fixPadding,
+        borderBottomWidth: 1.0,
+        borderBottomColor: Colors.blackColor,
+        paddingBottom: Sizes.fixPadding - 5.0,
+    },
+    customAmountInput: {
+        ...Fonts.blackColor17Regular,
+        flex: 1,
+        paddingVertical: 0,
     },
     priceCard: {
         padding: Sizes.fixPadding,
