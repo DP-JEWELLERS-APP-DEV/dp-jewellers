@@ -211,6 +211,7 @@ exports.updateCart = onCall({ region: "asia-south1" }, async (request) => {
     item.productId === productId &&
     item.size === (size || null) &&
     (item.selectedPurity || null) === (selectedPurity || null) &&
+    (item.selectedColor || null) === (selectedColor || null) &&
     (item.selectedDiamondQuality || null) === (selectedDiamondQuality || null);
 
   switch (action) {
@@ -221,19 +222,24 @@ exports.updateCart = onCall({ region: "asia-south1" }, async (request) => {
         throw new HttpsError("not-found", "Product not found or unavailable.");
       }
 
-      const cartItem = {
-        productId,
-        size: size || null,
-        quantity: quantity || 1,
-        addedAt: new Date().toISOString(),
-      };
+      const existingIndex = cart.findIndex(matchCartItem);
+      if (existingIndex >= 0) {
+        cart[existingIndex].quantity = (cart[existingIndex].quantity || 0) + (quantity || 1);
+      } else {
+        const cartItem = {
+          productId,
+          size: size || null,
+          quantity: quantity || 1,
+          addedAt: new Date().toISOString(),
+        };
 
-      // Store variant selections if provided
-      if (selectedPurity) cartItem.selectedPurity = selectedPurity;
-      if (selectedColor) cartItem.selectedColor = selectedColor;
-      if (selectedDiamondQuality) cartItem.selectedDiamondQuality = selectedDiamondQuality;
+        // Store variant selections if provided
+        if (selectedPurity) cartItem.selectedPurity = selectedPurity;
+        if (selectedColor) cartItem.selectedColor = selectedColor;
+        if (selectedDiamondQuality) cartItem.selectedDiamondQuality = selectedDiamondQuality;
 
-      cart.push(cartItem);
+        cart.push(cartItem);
+      }
       break;
     }
 

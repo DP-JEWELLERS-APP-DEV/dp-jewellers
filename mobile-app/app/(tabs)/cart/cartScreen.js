@@ -182,7 +182,7 @@ const CartScreen = () => {
         )
     }
 
-    async function updateQty({ productId, size, selectedPurity, selectedDiamondQuality, quantity }) {
+    async function updateQty({ productId, size, selectedPurity, selectedColor, selectedDiamondQuality, quantity }) {
         try {
             const updateCart = httpsCallable(functions, 'updateCart');
             await updateCart({
@@ -190,6 +190,7 @@ const CartScreen = () => {
                 productId,
                 size: size || null,
                 selectedPurity: selectedPurity || null,
+                selectedColor: selectedColor || null,
                 selectedDiamondQuality: selectedDiamondQuality || null,
                 quantity,
             });
@@ -199,7 +200,7 @@ const CartScreen = () => {
         }
     }
 
-    async function removeItem({ productId, size, selectedPurity, selectedDiamondQuality }) {
+    async function removeItem({ productId, size, selectedPurity, selectedColor, selectedDiamondQuality }) {
         try {
             const updateCart = httpsCallable(functions, 'updateCart');
             await updateCart({
@@ -207,6 +208,7 @@ const CartScreen = () => {
                 productId,
                 size: size || null,
                 selectedPurity: selectedPurity || null,
+                selectedColor: selectedColor || null,
                 selectedDiamondQuality: selectedDiamondQuality || null,
             });
             await fetchCart();
@@ -255,15 +257,16 @@ const CartScreen = () => {
                                     activeOpacity={0.5}
                                     onPress={() => {
                                         if (item.quantity > 1) {
-                                            updateQty({
-                                                productId: item.productId,
-                                                size: item.size,
-                                                selectedPurity: item.selectedPurity,
-                                                selectedDiamondQuality: item.selectedDiamondQuality,
-                                                quantity: item.quantity - 1
-                                            })
-                                        }
-                                    }}
+                                                updateQty({
+                                                    productId: item.productId,
+                                                    size: item.size,
+                                                    selectedPurity: item.selectedPurity,
+                                                    selectedColor: item.selectedColor,
+                                                    selectedDiamondQuality: item.selectedDiamondQuality,
+                                                    quantity: item.quantity - 1
+                                                })
+                                            }
+                                        }}
                                     style={styles.addRemoveBoxStyle}
                                 >
                                     <MaterialIcons name="remove" size={15} color={Colors.blackColor} />
@@ -278,6 +281,7 @@ const CartScreen = () => {
                                             productId: item.productId,
                                             size: item.size,
                                             selectedPurity: item.selectedPurity,
+                                            selectedColor: item.selectedColor,
                                             selectedDiamondQuality: item.selectedDiamondQuality,
                                             quantity: (item.quantity || 0) + 1
                                         })
@@ -291,7 +295,7 @@ const CartScreen = () => {
                                 name="trash-2"
                                 size={18}
                                 color={Colors.blackColor}
-                                onPress={() => { removeItem({ productId: item.productId, size: item.size, selectedPurity: item.selectedPurity, selectedDiamondQuality: item.selectedDiamondQuality }) }}
+                                onPress={() => { removeItem({ productId: item.productId, size: item.size, selectedPurity: item.selectedPurity, selectedColor: item.selectedColor, selectedDiamondQuality: item.selectedDiamondQuality }) }}
                             />
                         </View>
                     </View>
