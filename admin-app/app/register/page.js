@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { TextField, Button, Paper, Typography, Alert } from '@mui/material';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
@@ -75,13 +76,15 @@ export default function RegisterPage() {
         sx={{ backgroundColor: 'white', borderRadius: 2 }}
       >
         <div className="text-center mb-6">
-          <Typography
-            variant="h4"
-            className="font-bold mb-2"
-            sx={{ color: '#1E1B4B' }}
-          >
-            DP Jewellers
-          </Typography>
+          <div className="flex justify-center mb-3">
+            <Image
+              src="/dp-logo-02.png"
+              alt="DP Jewellers"
+              width={160}
+              height={60}
+              priority
+            />
+          </div>
           <Typography
             variant="body1"
             sx={{ color: '#666' }}

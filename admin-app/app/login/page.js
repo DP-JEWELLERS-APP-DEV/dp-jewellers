@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import {
   TextField,
   Button,
@@ -86,13 +87,15 @@ export default function LoginPage() {
         sx={{ backgroundColor: 'white', borderRadius: 2 }}
       >
         <div className="text-center mb-6">
-          <Typography
-            variant="h4"
-            className="font-bold mb-2"
-            sx={{ color: '#1E1B4B' }}
-          >
-            DP Jewellers
-          </Typography>
+          <div className="flex justify-center mb-3">
+            <Image
+              src="/dp-logo-02.png"
+              alt="DP Jewellers"
+              width={160}
+              height={60}
+              priority
+            />
+          </div>
           <Typography
             variant="body1"
             sx={{ color: '#666' }}

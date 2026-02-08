@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   Drawer,
@@ -82,12 +83,18 @@ export default function Sidebar({ mobileOpen, handleDrawerToggle, adminData }) {
   const drawer = (
     <div className="h-full flex flex-col" style={{ backgroundColor: '#1E1B4B' }}>
       <div className="p-6">
-        <Typography
-          variant="h5"
-          className="font-bold text-white text-center"
-        >
-          DP Jewellers
-        </Typography>
+        <div className="flex justify-center mb-3">
+          <div className="bg-white rounded-md px-3 py-2 shadow-sm">
+            <Image
+              src="/dp-logo-02.png"
+              alt="DP Jewellers"
+              width={140}
+              height={55}
+              priority
+            />
+          </div>
+        </div>
+      
         <Typography
           variant="caption"
           className="text-gray-300 text-center block mt-1"
