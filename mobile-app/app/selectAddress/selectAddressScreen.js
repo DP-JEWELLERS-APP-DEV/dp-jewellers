@@ -72,7 +72,7 @@ const SelectAddressScreen = () => {
     };
 
     const handleNext = () => {
-        if (!selectedAddressId) return;
+        if (selectedAddressId == null) return;
 
         const selectedAddress = addresses.find(a => (a.id ?? a._index) === selectedAddressId);
         if (!selectedAddress) return;
@@ -136,8 +136,8 @@ const SelectAddressScreen = () => {
             <TouchableOpacity
                 activeOpacity={0.8}
                 onPress={handleNext}
-                disabled={!selectedAddressId}
-                style={[CommomStyles.buttonStyle, !selectedAddressId && { backgroundColor: Colors.lightGrayColor }]}
+                disabled={selectedAddressId == null}
+                style={[CommomStyles.buttonStyle, selectedAddressId == null && { backgroundColor: Colors.lightGrayColor }]}
             >
                 <Text style={{ ...Fonts.whiteColor19Medium }}>
                     Continue to Payment
