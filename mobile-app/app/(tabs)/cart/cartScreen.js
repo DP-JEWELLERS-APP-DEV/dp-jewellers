@@ -1,8 +1,9 @@
-import { StyleSheet, Text, View, Image, FlatList, TouchableOpacity, ActivityIndicator } from 'react-native'
-import React, { useEffect, useState } from 'react'
+import { StyleSheet, Text, View, Image, FlatList, TouchableOpacity, ActivityIndicator, DeviceEventEmitter } from 'react-native'
+import React, { useEffect, useState, useCallback } from 'react'
 import { Colors, CommomStyles, Fonts, Screen, Sizes } from '../../../constants/styles';
 import { MaterialIcons, Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation, useRouter } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
 import { httpsCallable } from 'firebase/functions';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth, functions } from '../../../lib/firebase';
@@ -32,6 +33,14 @@ const CartScreen = () => {
 
         return () => unsubscribe();
     }, []);
+
+    useFocusEffect(
+        useCallback(() => {
+            if (auth?.currentUser) {
+                fetchCart();
+            }
+        }, [])
+    );
 
     const fetchCart = async () => {
         setloading(true);
@@ -195,6 +204,7 @@ const CartScreen = () => {
                 quantity,
             });
             await fetchCart();
+            DeviceEventEmitter.emit('cartUpdated');
         } catch (err) {
             seterrorText('Failed to update cart.');
         }
@@ -212,6 +222,7 @@ const CartScreen = () => {
                 selectedDiamondQuality: selectedDiamondQuality || null,
             });
             await fetchCart();
+            DeviceEventEmitter.emit('cartUpdated');
         } catch (err) {
             seterrorText('Failed to remove item.');
         }
