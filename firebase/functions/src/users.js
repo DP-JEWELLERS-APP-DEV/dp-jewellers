@@ -156,12 +156,26 @@ exports.getDashboardStats = onCall({ region: "asia-south1" }, async (request) =>
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
-  const [productsSnapshot, ordersSnapshot, pendingOrdersSnapshot, usersSnapshot] = await Promise.all([
+  const [productsSnapshot, ordersSnapshot, pendingOrdersSnapshot, usersSnapshot, allProductsSnapshot] = await Promise.all([
     db.collection("products").where("isActive", "==", true).count().get(),
     db.collection("orders").count().get(),
     db.collection("orders").where("orderStatus", "==", "pending").count().get(),
     db.collection("users").count().get(),
+    db.collection("products").get(),
   ]);
+
+  // Category-wise and status-wise product breakdown
+  const categoryWise = {};
+  let outOfStockCount = 0;
+  let totalAllProducts = 0;
+  allProductsSnapshot.forEach((doc) => {
+    const product = doc.data();
+    totalAllProducts++;
+    const cat = product.category || "Uncategorized";
+    categoryWise[cat] = (categoryWise[cat] || 0) + 1;
+    const status = product.status || (product.isActive !== false ? "active" : "inactive");
+    if (status === "out_of_stock") outOfStockCount++;
+  });
 
   // Get sales stats
   let todaySales = 0;
@@ -197,6 +211,9 @@ exports.getDashboardStats = onCall({ region: "asia-south1" }, async (request) =>
 
   return {
     totalProducts: productsSnapshot.data().count,
+    totalAllProducts,
+    outOfStockCount,
+    categoryWise,
     totalOrders: ordersSnapshot.data().count,
     pendingOrders: pendingOrdersSnapshot.data().count,
     totalUsers: usersSnapshot.data().count,

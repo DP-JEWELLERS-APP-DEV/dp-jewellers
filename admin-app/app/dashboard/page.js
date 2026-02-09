@@ -11,6 +11,8 @@ import {
   Diamond,
   CalendarToday,
   CalendarMonth,
+  RemoveShoppingCart,
+  Category,
 } from '@mui/icons-material';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import app from '@/lib/firebase';
@@ -20,6 +22,9 @@ const functions = getFunctions(app, 'asia-south1');
 export default function DashboardPage() {
   const [stats, setStats] = useState({
     totalProducts: 0,
+    totalAllProducts: 0,
+    outOfStockCount: 0,
+    categoryWise: {},
     totalOrders: 0,
     totalUsers: 0,
     pendingOrders: 0,
@@ -53,9 +58,16 @@ export default function DashboardPage() {
   const statCards = [
     {
       title: 'Total Products',
-      value: stats.totalProducts,
+      value: stats.totalAllProducts || stats.totalProducts,
+      subtitle: `${stats.totalProducts} Active`,
       icon: <Inventory sx={{ fontSize: 40, color: '#1E1B4B' }} />,
       color: '#E8E5F7',
+    },
+    {
+      title: 'Out of Stock',
+      value: stats.outOfStockCount || 0,
+      icon: <RemoveShoppingCart sx={{ fontSize: 40, color: '#1E1B4B' }} />,
+      color: '#FFE0E0',
     },
     {
       title: 'Total Orders',
@@ -129,12 +141,43 @@ export default function DashboardPage() {
                   >
                     {loading ? '...' : card.value}
                   </Typography>
+                  {card.subtitle && !loading && (
+                    <Typography variant="caption" sx={{ color: '#888' }}>
+                      {card.subtitle}
+                    </Typography>
+                  )}
                 </Box>
               </Box>
             </Paper>
           </Grid>
         ))}
       </Grid>
+
+      {/* Category-wise Product Breakdown */}
+      {!loading && stats.categoryWise && Object.keys(stats.categoryWise).length > 0 && (
+        <Box sx={{ mt: 3 }}>
+          <Paper elevation={2} sx={{ p: 3, backgroundColor: 'white', borderRadius: 2 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+              <Category sx={{ color: '#1E1B4B' }} />
+              <Typography variant="h6" sx={{ color: '#1E1B4B', fontWeight: 'bold' }}>
+                Products by Category
+              </Typography>
+            </Box>
+            <Grid container spacing={2}>
+              {Object.entries(stats.categoryWise)
+                .sort(([, a], [, b]) => b - a)
+                .map(([category, count]) => (
+                  <Grid item xs={6} sm={4} md={3} key={category}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 1, px: 1.5, backgroundColor: '#f9f9f9', borderRadius: 1 }}>
+                      <Typography variant="body2" sx={{ color: '#333' }}>{category}</Typography>
+                      <Chip label={count} size="small" sx={{ backgroundColor: '#E8E5F7', color: '#1E1B4B', fontWeight: 'bold' }} />
+                    </Box>
+                  </Grid>
+                ))}
+            </Grid>
+          </Paper>
+        </Box>
+      )}
 
       {/* Sales Stats */}
       <Grid container spacing={3} sx={{ mt: 1 }}>

@@ -23,6 +23,8 @@ import {
   FormGroup,
   CircularProgress,
   Tooltip,
+  Autocomplete,
+  InputAdornment,
 } from '@mui/material';
 import { DataGrid, GridToolbar } from '@mui/x-data-grid';
 import {
@@ -35,6 +37,7 @@ import {
   ExpandLess,
   Archive,
   RestoreFromTrash,
+  Search,
 } from '@mui/icons-material';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
@@ -144,6 +147,12 @@ export default function ProductsPage() {
   const [dialogError, setDialogError] = useState('');
   const [fieldErrors, setFieldErrors] = useState({});
   const dialogContentRef = useRef(null);
+
+  // Filter states
+  const [filterCategory, setFilterCategory] = useState([]);
+  const [filterMaterial, setFilterMaterial] = useState([]);
+  const [searchInput, setSearchInput] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     fetchProducts();
@@ -687,7 +696,25 @@ export default function ProductsPage() {
     };
   };
 
-  const pricePreview = calculatePreviewPrice();
+  const pricePreview = calculatePreviewPrice() || {
+    metalBreakdown: [],
+    metalValue: 0,
+    totalNetWeight: 0,
+    diamondValue: 0,
+    diamondBreakdown: [],
+    makingChargeAmount: 0,
+    wastageChargeAmount: 0,
+    stoneSettingCharges: 0,
+    designCharges: 0,
+    subtotal: 0,
+    discount: 0,
+    jewelryTaxRate: Number(formData.jewelryGst) || 3,
+    makingTaxRate: Number(formData.makingGst) || 5,
+    jewelryTax: 0,
+    labourTax: 0,
+    totalTax: 0,
+    finalPrice: 0,
+  };
 
   const handleSubmit = async () => {
     setDialogError('');
@@ -985,9 +1012,27 @@ export default function ProductsPage() {
     (c) => c.toLowerCase() === formData.category.toLowerCase()
   );
 
+  // Filtered products
+  const filteredProducts = products.filter((p) => {
+    if (filterCategory.length > 0 && !filterCategory.includes(p.category)) return false;
+    const productMaterial = (p.metal?.type || '').charAt(0).toUpperCase() + (p.metal?.type || '').slice(1);
+    if (filterMaterial.length > 0 && !filterMaterial.includes(productMaterial)) return false;
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      const nameMatch = (p.name || '').toLowerCase().includes(q);
+      const codeMatch = (p.productCode || '').toLowerCase().includes(q);
+      if (!nameMatch && !codeMatch) return false;
+    }
+    return true;
+  });
+
+  const handleSearch = () => {
+    setSearchQuery(searchInput);
+  };
+
   return (
     <div>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
         <Typography variant="h4" className="font-bold" sx={{ color: '#1E1B4B' }}>
           Products Management
         </Typography>
@@ -1001,6 +1046,62 @@ export default function ProductsPage() {
         </Button>
       </Box>
 
+      {/* Filters */}
+      <Box sx={{ display: 'flex', gap: 2, mb: 3, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+        <Autocomplete
+          multiple
+          size="small"
+          options={categories}
+          value={filterCategory}
+          onChange={(_, val) => setFilterCategory(val)}
+          renderInput={(params) => <TextField {...params} label="Category" placeholder="Select" />}
+          sx={{ minWidth: 220 }}
+        />
+        <Autocomplete
+          multiple
+          size="small"
+          options={materials}
+          value={filterMaterial}
+          onChange={(_, val) => setFilterMaterial(val)}
+          renderInput={(params) => <TextField {...params} label="Material" placeholder="Select" />}
+          sx={{ minWidth: 220 }}
+        />
+        <Box sx={{ display: 'flex', gap: 1 }}>
+          <TextField
+            size="small"
+            placeholder="Search name or code"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') handleSearch(); }}
+            sx={{ minWidth: 220 }}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <Search sx={{ fontSize: 20, color: '#999' }} />
+                </InputAdornment>
+              ),
+            }}
+          />
+          <Button
+            variant="contained"
+            onClick={handleSearch}
+            sx={{ ...buttonSx, minWidth: 'auto', px: 3 }}
+          >
+            Search
+          </Button>
+          {searchQuery && (
+            <Button
+              variant="outlined"
+              onClick={() => { setSearchInput(''); setSearchQuery(''); }}
+              sx={{ minWidth: 'auto', px: 2, textTransform: 'none', borderColor: '#1E1B4B', color: '#1E1B4B' }}
+              startIcon={<Close sx={{ fontSize: 16 }} />}
+            >
+              Clear
+            </Button>
+          )}
+        </Box>
+      </Box>
+
       {success && <Alert severity="success" className="!mb-4" onClose={() => setSuccess('')}>{success}</Alert>}
       {error && <Alert severity="error" className="!mb-4" onClose={() => setError('')}>{error}</Alert>}
 
@@ -1011,7 +1112,7 @@ export default function ProductsPage() {
       ) : (
         <Paper elevation={2} sx={{ backgroundColor: 'white', borderRadius: 2 }}>
           <DataGrid
-            rows={products}
+            rows={filteredProducts}
             columns={[
               { field: 'productCode', headerName: 'Code', width: 120, sortable: true },
               { field: 'name', headerName: 'Name', flex: 1, minWidth: 150, sortable: true },
@@ -1922,174 +2023,165 @@ export default function ProductsPage() {
 
           <Divider sx={{ mb: 3 }} />
 
-          {/* Price Calculation Preview */}
-          {pricePreview && (
-            <>
-              <Typography variant="subtitle1" sx={{ fontWeight: 'bold', color: '#1E1B4B', mb: 2 }}>
-                Price Calculation Preview
-              </Typography>
-              <Box sx={{ mb: 3, p: 2.5, backgroundColor: '#F5F5F5', borderRadius: 2, border: '1px solid #E0E0E0' }}>
-                <Grid container spacing={1} sx={{ display: "flex", flexDirection: "column" }}>
-                  {/* Metal Breakdown */}
-                  {pricePreview.metalBreakdown.map((m, i) => (
+          {/* Price Calculation Preview - Always visible */}
+          <Typography variant="subtitle1" sx={{ fontWeight: 'bold', color: '#1E1B4B', mb: 2 }}>
+            Price Calculation Preview
+          </Typography>
+          <Box sx={{ mb: 3, p: 2.5, backgroundColor: '#F5F5F5', borderRadius: 2, border: '1px solid #E0E0E0' }}>
+            <Grid container spacing={1} sx={{ display: "flex", flexDirection: "column" }}>
+              {/* Metal Breakdown */}
+              {pricePreview.metalBreakdown.length > 0 ? (
+                pricePreview.metalBreakdown.map((m, i) => (
+                  <React.Fragment key={i}>
+                    <Grid item xs={8}>
+                      <Typography variant="body2" sx={{ color: '#666' }}>
+                        {m.type} ({m.purity?.replace('_', ' ') || ''}): {m.weight}g × ₹{m.rate.toLocaleString('en-IN')}/g
+                      </Typography>
+                    </Grid>
+                    <Grid item xs={4} sx={{ textAlign: 'right' }}>
+                      <Typography variant="body2">₹{m.value.toLocaleString('en-IN')}</Typography>
+                    </Grid>
+                  </React.Fragment>
+                ))
+              ) : (
+                <>
+                  <Grid item xs={8}>
+                    <Typography variant="body2" sx={{ color: '#999' }}>Metal Value</Typography>
+                  </Grid>
+                  <Grid item xs={4} sx={{ textAlign: 'right' }}>
+                    <Typography variant="body2" sx={{ color: '#999' }}>₹0</Typography>
+                  </Grid>
+                </>
+              )}
+
+              {pricePreview.metalBreakdown.length > 1 && (
+                <>
+                  <Grid item xs={8}>
+                    <Typography variant="body2" sx={{ color: '#666', fontWeight: 'bold' }}>
+                      Total Metal Value ({pricePreview.totalNetWeight}g)
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={4} sx={{ textAlign: 'right' }}>
+                    <Typography variant="body2" sx={{ fontWeight: 'bold' }}>₹{pricePreview.metalValue.toLocaleString('en-IN')}</Typography>
+                  </Grid>
+                </>
+              )}
+
+              {pricePreview.diamondBreakdown.length > 0 && (
+                <>
+                  <Grid item xs={12}>
+                    <Divider sx={{ my: 0.5, borderStyle: 'dashed' }} />
+                  </Grid>
+                  {pricePreview.diamondBreakdown.map((d, i) => (
                     <React.Fragment key={i}>
                       <Grid item xs={8}>
                         <Typography variant="body2" sx={{ color: '#666' }}>
-                          {m.type} ({m.purity?.replace('_', ' ') || ''}): {m.weight}g × ₹{m.rate.toLocaleString('en-IN')}/g
+                          Diamond #{i + 1}: {d.weight}ct × ₹{d.rate.toLocaleString('en-IN')} ({d.clarity}→{d.bucket.split('-')[0]}, {d.color}→{d.bucket.split('-')[1]})
                         </Typography>
                       </Grid>
                       <Grid item xs={4} sx={{ textAlign: 'right' }}>
-                        <Typography variant="body2">₹{m.value.toLocaleString('en-IN')}</Typography>
+                        <Typography variant="body2">₹{d.value.toLocaleString('en-IN')}</Typography>
                       </Grid>
                     </React.Fragment>
                   ))}
-
-                  {pricePreview.metalBreakdown.length > 1 && (
-                    <>
-                      <Grid item xs={8}>
-                        <Typography variant="body2" sx={{ color: '#666', fontWeight: 'bold' }}>
-                          Total Metal Value ({pricePreview.totalNetWeight}g)
-                        </Typography>
-                      </Grid>
-                      <Grid item xs={4} sx={{ textAlign: 'right' }}>
-                        <Typography variant="body2" sx={{ fontWeight: 'bold' }}>₹{pricePreview.metalValue.toLocaleString('en-IN')}</Typography>
-                      </Grid>
-                    </>
-                  )}
-
-                  {pricePreview.diamondValue > 0 && (
-                    <>
-                      <Grid item xs={12}>
-                        <Divider sx={{ my: 0.5, borderStyle: 'dashed' }} />
-                      </Grid>
-                      {pricePreview.diamondBreakdown.map((d, i) => (
-                        <React.Fragment key={i}>
-                          <Grid item xs={8}>
-                            <Typography variant="body2" sx={{ color: '#666' }}>
-                              Diamond #{i + 1}: {d.weight}ct × ₹{d.rate.toLocaleString('en-IN')} ({d.clarity}→{d.bucket.split('-')[0]}, {d.color}→{d.bucket.split('-')[1]})
-                            </Typography>
-                          </Grid>
-                          <Grid item xs={4} sx={{ textAlign: 'right' }}>
-                            <Typography variant="body2">₹{d.value.toLocaleString('en-IN')}</Typography>
-                          </Grid>
-                        </React.Fragment>
-                      ))}
-                      <Grid item xs={8}>
-                        <Typography variant="body2" sx={{ color: '#666', fontWeight: 'bold' }}>Diamond Value (Total)</Typography>
-                      </Grid>
-                      <Grid item xs={4} sx={{ textAlign: 'right' }}>
-                        <Typography variant="body2" sx={{ fontWeight: 'bold' }}>₹{pricePreview.diamondValue.toLocaleString('en-IN')}</Typography>
-                      </Grid>
-                    </>
-                  )}
-
-                  {pricePreview.makingChargeAmount > 0 && (
-                    <>
-                      <Grid item xs={8}>
-                        <Typography variant="body2" sx={{ color: '#666' }}>
-                          Making Charges ({formData.makingChargeType === 'percentage' ? `${formData.makingChargeValue}%` : `₹${formData.makingChargeValue}`})
-                        </Typography>
-                      </Grid>
-                      <Grid item xs={4} sx={{ textAlign: 'right' }}>
-                        <Typography variant="body2">₹{pricePreview.makingChargeAmount.toLocaleString('en-IN')}</Typography>
-                      </Grid>
-                    </>
-                  )}
-
-                  {pricePreview.wastageChargeAmount > 0 && (
-                    <>
-                      <Grid item xs={8}>
-                        <Typography variant="body2" sx={{ color: '#666' }}>
-                          Wastage Charges ({formData.wastageChargeType === 'percentage' ? `${formData.wastageChargeValue}%` : `₹${formData.wastageChargeValue}`})
-                        </Typography>
-                      </Grid>
-                      <Grid item xs={4} sx={{ textAlign: 'right' }}>
-                        <Typography variant="body2">₹{pricePreview.wastageChargeAmount.toLocaleString('en-IN')}</Typography>
-                      </Grid>
-                    </>
-                  )}
-
-                  {pricePreview.stoneSettingCharges > 0 && (
-                    <>
-                      <Grid item xs={8}>
-                        <Typography variant="body2" sx={{ color: '#666' }}>Stone Setting Charges</Typography>
-                      </Grid>
-                      <Grid item xs={4} sx={{ textAlign: 'right' }}>
-                        <Typography variant="body2">₹{pricePreview.stoneSettingCharges.toLocaleString('en-IN')}</Typography>
-                      </Grid>
-                    </>
-                  )}
-
-                  {pricePreview.designCharges > 0 && (
-                    <>
-                      <Grid item xs={8}>
-                        <Typography variant="body2" sx={{ color: '#666' }}>Design Charges</Typography>
-                      </Grid>
-                      <Grid item xs={4} sx={{ textAlign: 'right' }}>
-                        <Typography variant="body2">₹{pricePreview.designCharges.toLocaleString('en-IN')}</Typography>
-                      </Grid>
-                    </>
-                  )}
-
-                  <Grid item xs={12}>
-                    <Divider sx={{ my: 0.5 }} />
-                  </Grid>
-
                   <Grid item xs={8}>
-                    <Typography variant="body2" sx={{ fontWeight: 'bold' }}>Subtotal</Typography>
+                    <Typography variant="body2" sx={{ color: '#666', fontWeight: 'bold' }}>Diamond Value (Total)</Typography>
                   </Grid>
                   <Grid item xs={4} sx={{ textAlign: 'right' }}>
-                    <Typography variant="body2" sx={{ fontWeight: 'bold' }}>₹{pricePreview.subtotal.toLocaleString('en-IN')}</Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 'bold' }}>₹{pricePreview.diamondValue.toLocaleString('en-IN')}</Typography>
                   </Grid>
+                </>
+              )}
 
-                  {pricePreview.discount > 0 && (
-                    <>
-                      <Grid item xs={8}>
-                        <Typography variant="body2" sx={{ color: '#4CAF50' }}>Discount</Typography>
-                      </Grid>
-                      <Grid item xs={4} sx={{ textAlign: 'right' }}>
-                        <Typography variant="body2" sx={{ color: '#4CAF50' }}>-₹{pricePreview.discount.toLocaleString('en-IN')}</Typography>
-                      </Grid>
-                    </>
-                  )}
+              <Grid item xs={8}>
+                <Typography variant="body2" sx={{ color: '#666' }}>
+                  Making Charges ({formData.makingChargeType === 'percentage' ? `${formData.makingChargeValue || 0}%` : `₹${formData.makingChargeValue || 0}`})
+                </Typography>
+              </Grid>
+              <Grid item xs={4} sx={{ textAlign: 'right' }}>
+                <Typography variant="body2">₹{pricePreview.makingChargeAmount.toLocaleString('en-IN')}</Typography>
+              </Grid>
 
+              <Grid item xs={8}>
+                <Typography variant="body2" sx={{ color: '#666' }}>
+                  Wastage Charges ({formData.wastageChargeType === 'percentage' ? `${formData.wastageChargeValue || 0}%` : `₹${formData.wastageChargeValue || 0}`})
+                </Typography>
+              </Grid>
+              <Grid item xs={4} sx={{ textAlign: 'right' }}>
+                <Typography variant="body2">₹{pricePreview.wastageChargeAmount.toLocaleString('en-IN')}</Typography>
+              </Grid>
+
+              <Grid item xs={8}>
+                <Typography variant="body2" sx={{ color: '#666' }}>Stone Setting Charges</Typography>
+              </Grid>
+              <Grid item xs={4} sx={{ textAlign: 'right' }}>
+                <Typography variant="body2">₹{pricePreview.stoneSettingCharges.toLocaleString('en-IN')}</Typography>
+              </Grid>
+
+              <Grid item xs={8}>
+                <Typography variant="body2" sx={{ color: '#666' }}>Design Charges</Typography>
+              </Grid>
+              <Grid item xs={4} sx={{ textAlign: 'right' }}>
+                <Typography variant="body2">₹{pricePreview.designCharges.toLocaleString('en-IN')}</Typography>
+              </Grid>
+
+              <Grid item xs={12}>
+                <Divider sx={{ my: 0.5 }} />
+              </Grid>
+
+              <Grid item xs={8}>
+                <Typography variant="body2" sx={{ fontWeight: 'bold' }}>Subtotal</Typography>
+              </Grid>
+              <Grid item xs={4} sx={{ textAlign: 'right' }}>
+                <Typography variant="body2" sx={{ fontWeight: 'bold' }}>₹{pricePreview.subtotal.toLocaleString('en-IN')}</Typography>
+              </Grid>
+
+              {pricePreview.discount > 0 && (
+                <>
                   <Grid item xs={8}>
-                    <Typography variant="body2" sx={{ color: '#666' }}>
-                      GST on Jewelry @ {pricePreview.jewelryTaxRate}%
-                    </Typography>
+                    <Typography variant="body2" sx={{ color: '#4CAF50' }}>Discount</Typography>
                   </Grid>
                   <Grid item xs={4} sx={{ textAlign: 'right' }}>
-                    <Typography variant="body2">₹{pricePreview.jewelryTax.toLocaleString('en-IN')}</Typography>
+                    <Typography variant="body2" sx={{ color: '#4CAF50' }}>-₹{pricePreview.discount.toLocaleString('en-IN')}</Typography>
                   </Grid>
+                </>
+              )}
 
-                  <Grid item xs={8}>
-                    <Typography variant="body2" sx={{ color: '#666' }}>
-                      GST on Making @ {pricePreview.makingTaxRate}%
-                    </Typography>
-                  </Grid>
-                  <Grid item xs={4} sx={{ textAlign: 'right' }}>
-                    <Typography variant="body2">₹{pricePreview.labourTax.toLocaleString('en-IN')}</Typography>
-                  </Grid>
+              <Grid item xs={8}>
+                <Typography variant="body2" sx={{ color: '#666' }}>
+                  GST on Jewelry @ {pricePreview.jewelryTaxRate}%
+                </Typography>
+              </Grid>
+              <Grid item xs={4} sx={{ textAlign: 'right' }}>
+                <Typography variant="body2">₹{pricePreview.jewelryTax.toLocaleString('en-IN')}</Typography>
+              </Grid>
 
-                  <Grid item xs={12}>
-                    <Divider sx={{ my: 0.5 }} />
-                  </Grid>
+              <Grid item xs={8}>
+                <Typography variant="body2" sx={{ color: '#666' }}>
+                  GST on Making @ {pricePreview.makingTaxRate}%
+                </Typography>
+              </Grid>
+              <Grid item xs={4} sx={{ textAlign: 'right' }}>
+                <Typography variant="body2">₹{pricePreview.labourTax.toLocaleString('en-IN')}</Typography>
+              </Grid>
 
-                  <Grid item xs={8}>
-                    <Typography variant="body1" sx={{ fontWeight: 'bold', color: '#1E1B4B' }}>
-                      Final Price
-                    </Typography>
-                  </Grid>
-                  <Grid item xs={4} sx={{ textAlign: 'right' }}>
-                    <Typography variant="body1" sx={{ fontWeight: 'bold', color: '#1E1B4B' }}>
-                      ₹{pricePreview.finalPrice.toLocaleString('en-IN')}
-                    </Typography>
-                  </Grid>
-                </Grid>
-              </Box>
-              <Divider sx={{ mb: 3 }} />
-            </>
-          )}
+              <Grid item xs={12}>
+                <Divider sx={{ my: 0.5 }} />
+              </Grid>
+
+              <Grid item xs={8}>
+                <Typography variant="body1" sx={{ fontWeight: 'bold', color: '#1E1B4B' }}>
+                  Final Price
+                </Typography>
+              </Grid>
+              <Grid item xs={4} sx={{ textAlign: 'right' }}>
+                <Typography variant="body1" sx={{ fontWeight: 'bold', color: '#1E1B4B' }}>
+                  ₹{pricePreview.finalPrice.toLocaleString('en-IN')}
+                </Typography>
+              </Grid>
+            </Grid>
+          </Box>
+          <Divider sx={{ mb: 3 }} />
 
           {/* Section 7: Status */}
           <Typography variant="subtitle1" sx={{ fontWeight: 'bold', color: '#1E1B4B', mb: 2 }}>
