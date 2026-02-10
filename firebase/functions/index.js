@@ -92,6 +92,7 @@ exports.manageAddress = mobileApp.manageAddress;
 exports.searchProducts = mobileApp.searchProducts;
 exports.getProductsByCategory = mobileApp.getProductsByCategory;
 exports.getHomePageData = mobileApp.getHomePageData;
+exports.trackUserActivity = mobileApp.trackUserActivity;
 exports.submitContactForm = mobileApp.submitContactForm;
 
 // ============================================

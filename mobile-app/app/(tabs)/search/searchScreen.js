@@ -1,10 +1,10 @@
 import { StyleSheet, Text, View, Image, TextInput, ScrollView, TouchableOpacity, FlatList, ActivityIndicator } from 'react-native'
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { Colors, Fonts, Sizes, Screen } from '../../../constants/styles'
 import { Feather, MaterialIcons } from '@expo/vector-icons';
 import { useLocalSearchParams, useNavigation } from 'expo-router';
 import { httpsCallable } from 'firebase/functions';
-import { functions } from '../../../lib/firebase';
+import { auth, functions } from '../../../lib/firebase';
 
 const popularSearches = [
     'Bracelets', 'Charms', 'Rings', 'Body Jewelry', 'Anklets', 'Necklace'
@@ -33,6 +33,7 @@ const SearchScreen = () => {
         minPrice: '',
         maxPrice: '',
     });
+    const lastTrackedSearchRef = useRef('');
 
     useEffect(() => {
         const material = params?.material ? String(params.material) : '';
@@ -70,6 +71,14 @@ const SearchScreen = () => {
                 });
                 if (active) {
                     setresults(res?.data?.products || []);
+                    const normalized = search.trim().toLowerCase();
+                    if (normalized && normalized.length >= 2 && auth?.currentUser && normalized !== lastTrackedSearchRef.current) {
+                        lastTrackedSearchRef.current = normalized;
+                        const trackUserActivity = httpsCallable(functions, 'trackUserActivity');
+                        trackUserActivity({ type: 'search', term: normalized }).catch(() => {
+                            // Ignore tracking errors
+                        });
+                    }
                 }
             } catch (err) {
                 if (active) {

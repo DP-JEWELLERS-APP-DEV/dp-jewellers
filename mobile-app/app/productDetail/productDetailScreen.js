@@ -40,6 +40,7 @@ const ProductDetailScreen = () => {
     const [showPriceBreakup, setShowPriceBreakup] = useState(false);
 
     const viewConfigRef = useRef({ viewAreaCoveragePercentThreshold: 60 });
+    const lastTrackedViewRef = useRef(null);
     const onViewRef = useRef(({ viewableItems }) => {
         if (viewableItems && viewableItems.length > 0) {
             setactiveIndex(viewableItems[0].index || 0);
@@ -95,6 +96,20 @@ const ProductDetailScreen = () => {
         fetchProduct();
         return () => { active = false; };
     }, [productId]);
+
+    useEffect(() => {
+        if (!auth?.currentUser || !productId || !product?.category) return;
+        if (lastTrackedViewRef.current === String(productId)) return;
+        lastTrackedViewRef.current = String(productId);
+        const trackUserActivity = httpsCallable(functions, 'trackUserActivity');
+        trackUserActivity({
+            type: 'view',
+            productId,
+            category: product.category,
+        }).catch(() => {
+            // Ignore tracking errors
+        });
+    }, [productId, product?.category]);
 
     useFocusEffect(
         useCallback(() => {

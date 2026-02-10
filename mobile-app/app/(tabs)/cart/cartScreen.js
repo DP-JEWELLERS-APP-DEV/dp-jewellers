@@ -242,7 +242,15 @@ const CartScreen = () => {
         };
 
         const renderItem = ({ item }) => (
-            <View style={styles.cartItemWrapStyle}>
+            <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => {
+                    if (item?.productId) {
+                        navigation.push('productDetail/productDetailScreen', { productId: item.productId });
+                    }
+                }}
+                style={styles.cartItemWrapStyle}
+            >
                 <View style={{ flexDirection: 'row', flex: 1, }}>
                     <View style={styles.jewelleryImageWrapStyle}>
                         <Image
@@ -311,7 +319,7 @@ const CartScreen = () => {
                         </View>
                     </View>
                 </View>
-            </View>
+            </TouchableOpacity>
         )
         return (
             <View style={{ marginTop: Sizes.fixPadding * 2.0, }}>

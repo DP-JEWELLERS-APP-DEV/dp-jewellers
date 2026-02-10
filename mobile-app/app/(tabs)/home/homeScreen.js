@@ -29,6 +29,7 @@ const HomeScreen = () => {
     const router = useRouter();
     const [categories, setcategories] = useState([]);
     const [featured, setfeatured] = useState([]);
+    const [recommended, setrecommended] = useState([]);
     const [popular, setpopular] = useState([]);
     const [bannerData, setBannerData] = useState([]);
     const [loading, setloading] = useState(true);
@@ -47,7 +48,9 @@ const HomeScreen = () => {
                 const res = await getHomePageData();
                 if (!active) return;
                 setcategories(res?.data?.categories || []);
-                setfeatured(res?.data?.featured || []);
+                const apiFeatured = res?.data?.featured || [];
+                setfeatured(apiFeatured);
+                setrecommended(res?.data?.recommended || apiFeatured);
                 setpopular(res?.data?.popular || []);
                 setBannerData(res?.data?.banners || []);
             } catch (err) {
@@ -198,7 +201,10 @@ const HomeScreen = () => {
     }
 
     function recommendedInfo() {
-        const productsWithFavorites = addFavoriteStatus(featured);
+        // Fallback to popular when no featured items are available.
+        const recommendedSource = (recommended && recommended.length > 0) ? recommended : popular;
+        if (!recommendedSource || recommendedSource.length === 0) return null;
+        const productsWithFavorites = addFavoriteStatus(recommendedSource);
         return (
             <View style={{ marginVertical: Sizes.fixPadding * 2.0, }}>
                 <Text style={{ marginHorizontal: Sizes.fixPadding * 2.0, ...Fonts.blackColor18SemiBold }}>

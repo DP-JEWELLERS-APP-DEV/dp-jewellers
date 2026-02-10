@@ -5,6 +5,26 @@ const { _calculateVariantPriceInternal } = require("./priceCalculation");
 const db = admin.firestore();
 const USERS = "users";
 const PRODUCTS = "products";
+const MAX_RECENT_ACTIVITY = 20;
+
+function normalizeSearchTerm(term) {
+  return String(term || "").trim().toLowerCase();
+}
+
+function mapProductDoc(doc) {
+  const data = doc.data();
+  return {
+    productId: doc.id,
+    name: data.name,
+    category: data.category,
+    image: data.images?.[0]?.url || "",
+    finalPrice: data.priceRange?.defaultPrice || data.pricing?.finalPrice || 0,
+    priceRange: data.priceRange || null,
+    metalType: data.metal?.type || "",
+    purchaseCount: data.purchaseCount || 0,
+    isActive: data.isActive !== false,
+  };
+}
 
 // Verify the caller is authenticated
 function verifyAuth(auth) {
@@ -100,6 +120,61 @@ exports.updateUserProfile = onCall({ region: "asia-south1" }, async (request) =>
   await userRef.update(updateData);
 
   return { userId: request.auth.uid, message: "Profile updated successfully." };
+});
+
+/**
+ * Track recent user activity (views, searches) for recommendations
+ */
+exports.trackUserActivity = onCall({ region: "asia-south1" }, async (request) => {
+  verifyAuth(request.auth);
+
+  const { type, productId, category, term } = request.data || {};
+
+  if (!type || !["view", "search"].includes(type)) {
+    throw new HttpsError("invalid-argument", "type must be 'view' or 'search'.");
+  }
+
+  const userRef = db.collection(USERS).doc(request.auth.uid);
+  const userDoc = await userRef.get();
+
+  if (!userDoc.exists) {
+    throw new HttpsError("not-found", "User profile not found.");
+  }
+
+  const userData = userDoc.data() || {};
+  const updates = {
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  };
+
+  if (type === "view") {
+    if (!productId) {
+      throw new HttpsError("invalid-argument", "productId is required for view activity.");
+    }
+    const existing = Array.isArray(userData.recentViews) ? userData.recentViews : [];
+    const filtered = existing.filter((v) => String(v.productId) !== String(productId));
+    const entry = {
+      productId: String(productId),
+      category: category ? String(category) : "",
+      viewedAt: admin.firestore.Timestamp.now(),
+    };
+    updates.recentViews = [entry, ...filtered].slice(0, MAX_RECENT_ACTIVITY);
+  } else if (type === "search") {
+    const normalized = normalizeSearchTerm(term);
+    if (!normalized) {
+      throw new HttpsError("invalid-argument", "term is required for search activity.");
+    }
+    const existing = Array.isArray(userData.recentSearches) ? userData.recentSearches : [];
+    const filtered = existing.filter((s) => normalizeSearchTerm(s.term) !== normalized);
+    const entry = {
+      term: normalized,
+      searchedAt: admin.firestore.Timestamp.now(),
+    };
+    updates.recentSearches = [entry, ...filtered].slice(0, MAX_RECENT_ACTIVITY);
+  }
+
+  await userRef.update(updates);
+
+  return { ok: true };
 });
 
 // ============================================
@@ -631,6 +706,7 @@ exports.getHomePageData = onCall({ region: "asia-south1" }, async (_request) => 
   let popular = [];
   let categories = [];
   let banners = [];
+  let recommended = [];
 
   try {
     const featuredSnapshot = await db.collection(PRODUCTS)
@@ -639,18 +715,7 @@ exports.getHomePageData = onCall({ region: "asia-south1" }, async (_request) => 
       .limit(6)
       .get();
 
-    featured = featuredSnapshot.docs.map((doc) => {
-      const data = doc.data();
-      return {
-        productId: doc.id,
-        name: data.name,
-        category: data.category,
-        image: data.images?.[0]?.url || "",
-        finalPrice: data.priceRange?.defaultPrice || data.pricing?.finalPrice || 0,
-        priceRange: data.priceRange || null,
-        metalType: data.metal?.type || "",
-      };
-    });
+    featured = featuredSnapshot.docs.map(mapProductDoc);
   } catch (err) {
     console.error("getHomePageData: featured query failed", err);
   }
@@ -662,18 +727,7 @@ exports.getHomePageData = onCall({ region: "asia-south1" }, async (_request) => 
       .limit(8)
       .get();
 
-    popular = popularSnapshot.docs.map((doc) => {
-      const data = doc.data();
-      return {
-        productId: doc.id,
-        name: data.name,
-        category: data.category,
-        image: data.images?.[0]?.url || "",
-        finalPrice: data.priceRange?.defaultPrice || data.pricing?.finalPrice || 0,
-        priceRange: data.priceRange || null,
-        metalType: data.metal?.type || "",
-      };
-    });
+    popular = popularSnapshot.docs.map(mapProductDoc);
   } catch (err) {
     console.error("getHomePageData: popular query failed", err);
   }
@@ -720,9 +774,130 @@ exports.getHomePageData = onCall({ region: "asia-south1" }, async (_request) => 
     console.error("getHomePageData: banners query failed", err);
   }
 
+  // Build personalized recommendations if user is authenticated.
+  try {
+    if (_request.auth) {
+      const uid = _request.auth.uid;
+      const userDoc = await db.collection(USERS).doc(uid).get();
+      const userData = userDoc.exists ? userDoc.data() : {};
+
+      const recentViews = Array.isArray(userData.recentViews) ? userData.recentViews : [];
+      const recentSearches = Array.isArray(userData.recentSearches) ? userData.recentSearches : [];
+
+      const categoryWeights = new Map();
+      const addCategory = (category, weight) => {
+        const key = String(category || "").trim();
+        if (!key) return;
+        categoryWeights.set(key, (categoryWeights.get(key) || 0) + weight);
+      };
+
+      // Views boost
+      recentViews.forEach((view) => {
+        addCategory(view.category, 3);
+      });
+
+      // Purchases boost
+      const ordersSnapshot = await db.collection("orders")
+        .where("userId", "==", uid)
+        .orderBy("orderedAt", "desc")
+        .limit(5)
+        .get();
+
+      const orderedProductIds = new Set();
+      ordersSnapshot.forEach((doc) => {
+        const items = doc.data()?.items || [];
+        items.forEach((item) => {
+          if (item?.productId) {
+            orderedProductIds.add(String(item.productId));
+          }
+        });
+      });
+
+      if (orderedProductIds.size > 0) {
+        const productDocs = await Promise.all(
+          Array.from(orderedProductIds).slice(0, 20).map((id) => db.collection(PRODUCTS).doc(id).get())
+        );
+        productDocs.forEach((doc) => {
+          if (doc.exists) {
+            const data = doc.data();
+            addCategory(data.category, 5);
+          }
+        });
+      }
+
+      // Searches boost (only if search term matches a category)
+      if (categories.length > 0) {
+        const categoryLookup = new Map(
+          categories.map((c) => [String(c).toLowerCase(), c])
+        );
+        recentSearches.forEach((search) => {
+          const term = normalizeSearchTerm(search.term);
+          if (categoryLookup.has(term)) {
+            addCategory(categoryLookup.get(term), 2);
+          }
+        });
+      }
+
+      const topCategories = Array.from(categoryWeights.entries())
+        .sort((a, b) => b[1] - a[1])
+        .map(([category]) => category)
+        .slice(0, 5);
+
+      let categoryProducts = [];
+      if (topCategories.length > 0) {
+        const categorySnapshot = await db.collection(PRODUCTS)
+          .where("isActive", "==", true)
+          .where("category", "in", topCategories)
+          .limit(30)
+          .get();
+        categoryProducts = categorySnapshot.docs.map(mapProductDoc);
+      }
+
+      let popularCandidates = [];
+      try {
+        const popularSnapshot = await db.collection(PRODUCTS)
+          .orderBy("purchaseCount", "desc")
+          .limit(20)
+          .get();
+        popularCandidates = popularSnapshot.docs
+          .map(mapProductDoc)
+          .filter((p) => p.isActive);
+      } catch (err) {
+        console.error("getHomePageData: popularity query failed", err);
+      }
+
+      const byId = new Map();
+      [...categoryProducts, ...popularCandidates].forEach((product) => {
+        if (product?.productId) {
+          byId.set(String(product.productId), product);
+        }
+      });
+
+      recommended = Array.from(byId.values())
+        .map((product) => {
+          const categoryScore = categoryWeights.get(product.category) || 0;
+          const popularityScore = product.purchaseCount || 0;
+          return {
+            ...product,
+            _score: (categoryScore * 100) + popularityScore,
+          };
+        })
+        .sort((a, b) => b._score - a._score)
+        .slice(0, 5)
+        .map(({ _score, ...product }) => product);
+    }
+  } catch (err) {
+    console.error("getHomePageData: recommendation build failed", err);
+  }
+
+  if (!recommended || recommended.length === 0) {
+    recommended = featured.length > 0 ? featured : popular;
+  }
+
   return {
     categories,
     featured,
+    recommended,
     popular,
     banners,
   };
