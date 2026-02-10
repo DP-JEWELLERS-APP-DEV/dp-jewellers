@@ -1,6 +1,7 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
 const { requiresApproval } = require("./approvalUtils");
+const { logActivity } = require("./activityLog");
 
 const db = admin.firestore();
 
@@ -113,6 +114,8 @@ exports.updateMetalRates = onCall({ region: "asia-south1" }, async (request) => 
       reviewNote: null,
     });
 
+    logActivity({ module: "metalRates", action: "update", entityId: "current", entityName: "Metal Rates", performedBy: request.auth.uid, performedByEmail: adminData.email, performedByRole: adminData.role, details: { pendingApproval: true, updatedCategories: [gold ? "gold" : null, silver ? "silver" : null, diamond ? "diamond" : null, platinum ? "platinum" : null].filter(Boolean) } });
+
     return {
       message: "Rate changes submitted for approval. Current rates remain unchanged until approved.",
       pendingApproval: true,
@@ -127,6 +130,8 @@ exports.updateMetalRates = onCall({ region: "asia-south1" }, async (request) => 
 
   // Use set with merge to handle first-time creation
   await ratesRef.set(updateData, { merge: true });
+
+  logActivity({ module: "metalRates", action: "update", entityId: "current", entityName: "Metal Rates", performedBy: request.auth.uid, performedByEmail: adminData.email, performedByRole: adminData.role, details: { updatedCategories: [gold ? "gold" : null, silver ? "silver" : null, diamond ? "diamond" : null, platinum ? "platinum" : null].filter(Boolean) } });
 
   return {
     message: "Metal rates updated successfully. Product prices will be recalculated.",

@@ -2,6 +2,7 @@ const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
 const { _computePriceRange } = require("./priceCalculation");
 const { requiresApproval } = require("./approvalUtils");
+const { logActivity } = require("./activityLog");
 
 const db = admin.firestore();
 const PRODUCTS = "products";
@@ -178,6 +179,8 @@ exports.createProduct = onCall({ region: "asia-south1" }, async (request) => {
       reviewNote: null,
     });
 
+    logActivity({ module: "products", action: "create", entityId: docRef.id, entityName: data.name, performedBy: request.auth.uid, performedByEmail: adminData.email, performedByRole: adminData.role, details: { productCode: data.productCode, category: data.category, pendingApproval: true } });
+
     return {
       productId: docRef.id,
       message: "Product created and submitted for approval. It will be visible once approved.",
@@ -186,6 +189,8 @@ exports.createProduct = onCall({ region: "asia-south1" }, async (request) => {
   }
 
   const docRef = await db.collection(PRODUCTS).add(product);
+
+  logActivity({ module: "products", action: "create", entityId: docRef.id, entityName: data.name, performedBy: request.auth.uid, performedByEmail: adminData.email, performedByRole: adminData.role, details: { productCode: data.productCode, category: data.category } });
 
   return { productId: docRef.id, message: "Product created successfully." };
 });
@@ -264,6 +269,8 @@ exports.updateProduct = onCall({ region: "asia-south1" }, async (request) => {
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
 
+    logActivity({ module: "products", action: "update", entityId: productId, entityName: existingData.name, performedBy: request.auth.uid, performedByEmail: adminData.email, performedByRole: adminData.role, details: { pendingApproval: true, changedFields: Object.keys(updateData) } });
+
     return {
       productId,
       message: "Changes submitted for approval. The live product is unchanged until approved.",
@@ -274,6 +281,8 @@ exports.updateProduct = onCall({ region: "asia-south1" }, async (request) => {
   updateData.updatedAt = admin.firestore.FieldValue.serverTimestamp();
 
   await productRef.update(updateData);
+
+  logActivity({ module: "products", action: "update", entityId: productId, entityName: existingData.name, performedBy: request.auth.uid, performedByEmail: adminData.email, performedByRole: adminData.role, details: { changedFields: Object.keys(updateData).filter(k => k !== "updatedAt") } });
 
   return { productId, message: "Product updated successfully." };
 });
@@ -313,6 +322,8 @@ exports.deleteProduct = onCall({ region: "asia-south1" }, async (request) => {
       reviewNote: null,
     });
 
+    logActivity({ module: "products", action: "archive", entityId: productId, entityName: productDoc.data().name, performedBy: request.auth.uid, performedByEmail: adminData.email, performedByRole: adminData.role, details: { pendingApproval: true } });
+
     return {
       productId,
       message: "Archive request submitted for approval.",
@@ -325,6 +336,8 @@ exports.deleteProduct = onCall({ region: "asia-south1" }, async (request) => {
     isActive: false,
     updatedAt: admin.firestore.FieldValue.serverTimestamp(),
   });
+
+  logActivity({ module: "products", action: "archive", entityId: productId, entityName: productDoc.data().name, performedBy: request.auth.uid, performedByEmail: adminData.email, performedByRole: adminData.role });
 
   return { productId, message: "Product archived successfully." };
 });
@@ -364,6 +377,8 @@ exports.restoreProduct = onCall({ region: "asia-south1" }, async (request) => {
       reviewNote: null,
     });
 
+    logActivity({ module: "products", action: "restore", entityId: productId, entityName: productDoc.data().name, performedBy: request.auth.uid, performedByEmail: adminData.email, performedByRole: adminData.role, details: { pendingApproval: true } });
+
     return {
       productId,
       message: "Restore request submitted for approval.",
@@ -376,6 +391,8 @@ exports.restoreProduct = onCall({ region: "asia-south1" }, async (request) => {
     isActive: true,
     updatedAt: admin.firestore.FieldValue.serverTimestamp(),
   });
+
+  logActivity({ module: "products", action: "restore", entityId: productId, entityName: productDoc.data().name, performedBy: request.auth.uid, performedByEmail: adminData.email, performedByRole: adminData.role });
 
   return { productId, message: "Product restored successfully." };
 });

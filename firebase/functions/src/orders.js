@@ -1,5 +1,6 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
+const { logActivity } = require("./activityLog");
 
 const db = admin.firestore();
 
@@ -240,7 +241,7 @@ exports.createOrder = onCall({ region: "asia-south1" }, async (request) => {
  * Update order status (admin only)
  */
 exports.updateOrderStatus = onCall({ region: "asia-south1" }, async (request) => {
-  await verifyOrderAdmin(request.auth);
+  const adminData = await verifyOrderAdmin(request.auth);
 
   const { orderDocId, newStatus, note, estimatedDeliveryDate, delayReason } = request.data;
 
@@ -327,6 +328,8 @@ exports.updateOrderStatus = onCall({ region: "asia-south1" }, async (request) =>
   }
 
   await orderRef.update(updateData);
+
+  logActivity({ module: "orders", action: "updateStatus", entityId: orderDocId, entityName: currentOrder.orderId || orderDocId, performedBy: request.auth.uid, performedByEmail: adminData.email, performedByRole: adminData.role, details: { oldStatus: currentOrder.orderStatus, newStatus, note: note || "" } });
 
   return { orderDocId, newStatus, message: `Order status updated to ${newStatus}.` };
 });

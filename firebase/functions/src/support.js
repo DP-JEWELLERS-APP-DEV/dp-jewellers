@@ -1,5 +1,6 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
+const { logActivity } = require("./activityLog");
 const db = admin.firestore();
 
 async function verifySuperAdmin(auth) {
@@ -38,7 +39,7 @@ exports.getContactDetails = onCall({ region: "asia-south1" }, async (request) =>
 });
 
 exports.updateContactDetails = onCall({ region: "asia-south1" }, async (request) => {
-  await verifySuperAdmin(request.auth);
+  const adminData = await verifySuperAdmin(request.auth);
 
   const { storeName, address, phone, alternatePhone, email, whatsapp, businessHours } = request.data;
 
@@ -63,6 +64,8 @@ exports.updateContactDetails = onCall({ region: "asia-south1" }, async (request)
   };
 
   await db.collection("contactDetails").doc("current").set(updateData, { merge: true });
+
+  logActivity({ module: "support", action: "update", entityId: "current", entityName: storeName || "Contact Details", performedBy: request.auth.uid, performedByEmail: adminData.email, performedByRole: adminData.role });
 
   return { message: "Contact details updated successfully." };
 });

@@ -1,5 +1,6 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
+const { logActivity } = require("./activityLog");
 
 const db = admin.firestore();
 
@@ -144,6 +145,8 @@ exports.reviewApproval = onCall({ region: "asia-south1" }, async (request) => {
     reviewedAt: admin.firestore.FieldValue.serverTimestamp(),
     reviewNote: reviewNote || null,
   });
+
+  logActivity({ module: "approvals", action: decision === "approved" ? "approve" : "reject", entityId: approvalId, entityName: `${approval.entityType}:${approval.entityName}`, performedBy: request.auth.uid, performedByEmail: callerData.email, performedByRole: "super_admin", details: { entityType: approval.entityType, actionType: approval.actionType, originalEntityId: approval.entityId, reviewNote: reviewNote || null } });
 
   return { approvalId, decision, message: `Approval ${decision} successfully.` };
 });

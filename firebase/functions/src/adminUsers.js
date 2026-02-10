@@ -1,5 +1,6 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
+const { logActivity } = require("./activityLog");
 
 const db = admin.firestore();
 
@@ -80,6 +81,8 @@ exports.createAdmin = onCall({ region: "asia-south1" }, async (request) => {
   };
 
   await db.collection("admins").doc(userRecord.uid).set(adminData);
+
+  logActivity({ module: "adminUsers", action: "create", entityId: userRecord.uid, entityName: email, performedBy: request.auth.uid, performedByEmail: callerDoc.data().email, performedByRole: "super_admin", details: { role, isNewUser } });
 
   return {
     adminId: userRecord.uid,
@@ -237,6 +240,8 @@ exports.updateAdmin = onCall({ region: "asia-south1" }, async (request) => {
 
   await db.collection("admins").doc(uid).update(updateData);
 
+  logActivity({ module: "adminUsers", action: "update", entityId: uid, entityName: targetDoc.data().email || uid, performedBy: request.auth.uid, performedByEmail: callerDoc.data().email, performedByRole: "super_admin", details: { changedFields: Object.keys(updateData).filter(k => k !== "updatedAt") } });
+
   return { uid, message: "Admin updated successfully." };
 });
 
@@ -281,6 +286,8 @@ exports.deactivateAdmin = onCall({ region: "asia-south1" }, async (request) => {
   // Remove admin custom claims
   await admin.auth().setCustomUserClaims(uid, { admin: false });
 
+  logActivity({ module: "adminUsers", action: "deactivate", entityId: uid, entityName: targetDoc.data().email || uid, performedBy: request.auth.uid, performedByEmail: callerDoc.data().email, performedByRole: "super_admin" });
+
   return { uid, message: "Admin deactivated successfully." };
 });
 
@@ -320,6 +327,8 @@ exports.reactivateAdmin = onCall({ region: "asia-south1" }, async (request) => {
     admin: true,
     role: targetData.role || "admin",
   });
+
+  logActivity({ module: "adminUsers", action: "reactivate", entityId: uid, entityName: targetDoc.data().email || uid, performedBy: request.auth.uid, performedByEmail: callerDoc.data().email, performedByRole: "super_admin" });
 
   return { uid, message: "Admin reactivated successfully." };
 });

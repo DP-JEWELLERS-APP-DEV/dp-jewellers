@@ -1,6 +1,7 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
 const { requiresApproval } = require("./approvalUtils");
+const { logActivity } = require("./activityLog");
 
 const db = admin.firestore();
 const BANNERS = "banners";
@@ -136,6 +137,8 @@ exports.saveBanner = onCall({ region: "asia-south1" }, async (request) => {
       reviewNote: null,
     });
 
+    logActivity({ module: "banners", action: isUpdate ? "update" : "create", entityId: isUpdate ? bannerId : "pending", entityName: title, performedBy: request.auth.uid, performedByEmail: callerData.email, performedByRole: callerData.role, details: { pendingApproval: true } });
+
     return {
       message: isUpdate
         ? "Banner update submitted for approval."
@@ -151,12 +154,14 @@ exports.saveBanner = onCall({ region: "asia-south1" }, async (request) => {
       throw new HttpsError("not-found", "Banner not found.");
     }
     await db.collection(BANNERS).doc(bannerId).update(bannerData);
+    logActivity({ module: "banners", action: "update", entityId: bannerId, entityName: title, performedBy: request.auth.uid, performedByEmail: callerData.email, performedByRole: callerData.role });
     return { bannerId, message: "Banner updated successfully." };
   } else {
     // Create new banner
     bannerData.createdAt = admin.firestore.FieldValue.serverTimestamp();
     bannerData.createdBy = request.auth.uid;
     const docRef = await db.collection(BANNERS).add(bannerData);
+    logActivity({ module: "banners", action: "create", entityId: docRef.id, entityName: title, performedBy: request.auth.uid, performedByEmail: callerData.email, performedByRole: callerData.role });
     return { bannerId: docRef.id, message: "Banner created successfully." };
   }
 });
@@ -195,10 +200,14 @@ exports.deleteBanner = onCall({ region: "asia-south1" }, async (request) => {
       reviewNote: null,
     });
 
+    logActivity({ module: "banners", action: "delete", entityId: bannerId, entityName: bannerDoc.data().title || bannerId, performedBy: request.auth.uid, performedByEmail: callerData.email, performedByRole: callerData.role, details: { pendingApproval: true } });
+
     return { message: "Banner deletion submitted for approval.", pendingApproval: true };
   }
 
   await db.collection(BANNERS).doc(bannerId).delete();
+
+  logActivity({ module: "banners", action: "delete", entityId: bannerId, entityName: bannerDoc.data().title || bannerId, performedBy: request.auth.uid, performedByEmail: callerData.email, performedByRole: callerData.role });
 
   return { bannerId, message: "Banner deleted successfully." };
 });

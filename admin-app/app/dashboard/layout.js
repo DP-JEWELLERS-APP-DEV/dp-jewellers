@@ -22,6 +22,7 @@ const routePermissions = {
   '/dashboard/stores': { roles: ['super_admin'] },
   '/dashboard/users': { roles: ['super_admin'], permission: 'manageUsers' },
   '/dashboard/admins': { roles: ['super_admin'] },
+  '/dashboard/activity-log': { roles: ['super_admin'] },
   '/dashboard/support': { roles: ['super_admin', 'admin', 'editor'] },
 };
 

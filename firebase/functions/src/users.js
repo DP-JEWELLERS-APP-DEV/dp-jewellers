@@ -1,5 +1,6 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
+const { logActivity } = require("./activityLog");
 
 const db = admin.firestore();
 
@@ -86,7 +87,7 @@ exports.getUserDetails = onCall({ region: "asia-south1" }, async (request) => {
  * Update user details (admin only)
  */
 exports.updateUser = onCall({ region: "asia-south1" }, async (request) => {
-  await verifyUserAdmin(request.auth);
+  const adminData = await verifyUserAdmin(request.auth);
 
   const { userId, name, email, phone, address, isActive } = request.data;
   if (!userId) {
@@ -110,6 +111,8 @@ exports.updateUser = onCall({ region: "asia-south1" }, async (request) => {
 
   await db.collection("users").doc(userId).update(updateData);
 
+  logActivity({ module: "users", action: "update", entityId: userId, entityName: userDoc.data().email || userDoc.data().name || userId, performedBy: request.auth.uid, performedByEmail: adminData.email, performedByRole: adminData.role, details: { changedFields: Object.keys(updateData).filter(k => k !== "updatedAt") } });
+
   return { userId, message: "User updated successfully." };
 });
 
@@ -117,7 +120,7 @@ exports.updateUser = onCall({ region: "asia-south1" }, async (request) => {
  * Delete user (admin only) - soft delete by deactivating
  */
 exports.deleteUser = onCall({ region: "asia-south1" }, async (request) => {
-  await verifyUserAdmin(request.auth);
+  const adminData = await verifyUserAdmin(request.auth);
 
   const { userId } = request.data;
   if (!userId) {
@@ -134,6 +137,8 @@ exports.deleteUser = onCall({ region: "asia-south1" }, async (request) => {
     deletedAt: admin.firestore.FieldValue.serverTimestamp(),
     updatedAt: admin.firestore.FieldValue.serverTimestamp(),
   });
+
+  logActivity({ module: "users", action: "delete", entityId: userId, entityName: userDoc.data().email || userDoc.data().name || userId, performedBy: request.auth.uid, performedByEmail: adminData.email, performedByRole: adminData.role });
 
   return { userId, message: "User deactivated successfully." };
 });

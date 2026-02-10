@@ -9,6 +9,7 @@ const orders = require("./src/orders");
 const adminUsers = require("./src/adminUsers");
 const images = require("./src/images");
 const users = require("./src/users");
+const activityLog = require("./src/activityLog");
 
 // ============================================
 // PRODUCT FUNCTIONS
@@ -117,3 +118,8 @@ exports.deleteStore = stores.deleteStore;
 const support = require("./src/support");
 exports.getContactDetails = support.getContactDetails;
 exports.updateContactDetails = support.updateContactDetails;
+
+// ============================================
+// ACTIVITY LOG FUNCTIONS
+// ============================================
+exports.listActivityLogs = activityLog.listActivityLogs;

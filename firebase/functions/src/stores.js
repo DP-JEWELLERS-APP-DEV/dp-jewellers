@@ -1,5 +1,6 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
+const { logActivity } = require("./activityLog");
 
 const db = admin.firestore();
 
@@ -61,7 +62,7 @@ exports.getActiveStores = onCall({ region: "asia-south1" }, async (_request) => 
  * Create a new store
  */
 exports.createStore = onCall({ region: "asia-south1" }, async (request) => {
-  await verifyAdmin(request.auth);
+  const adminData = await verifyAdmin(request.auth);
 
   const { name, address, city, state, pincode, phone, email, openingHours, isActive, isPrimary } = request.data;
 
@@ -97,6 +98,8 @@ exports.createStore = onCall({ region: "asia-south1" }, async (request) => {
 
   const docRef = await db.collection("stores").add(storeData);
 
+  logActivity({ module: "stores", action: "create", entityId: docRef.id, entityName: name, performedBy: request.auth.uid, performedByEmail: adminData.email, performedByRole: adminData.role });
+
   return { storeId: docRef.id, message: "Store created successfully." };
 });
 
@@ -104,7 +107,7 @@ exports.createStore = onCall({ region: "asia-south1" }, async (request) => {
  * Update a store
  */
 exports.updateStore = onCall({ region: "asia-south1" }, async (request) => {
-  await verifyAdmin(request.auth);
+  const adminData = await verifyAdmin(request.auth);
 
   const { storeId, name, address, city, state, pincode, phone, email, openingHours, isActive, isPrimary } = request.data;
 
@@ -146,6 +149,8 @@ exports.updateStore = onCall({ region: "asia-south1" }, async (request) => {
 
   await db.collection("stores").doc(storeId).update(updateData);
 
+  logActivity({ module: "stores", action: "update", entityId: storeId, entityName: storeDoc.data().name || storeId, performedBy: request.auth.uid, performedByEmail: adminData.email, performedByRole: adminData.role, details: { changedFields: Object.keys(updateData).filter(k => k !== "updatedAt") } });
+
   return { storeId, message: "Store updated successfully." };
 });
 
@@ -153,7 +158,7 @@ exports.updateStore = onCall({ region: "asia-south1" }, async (request) => {
  * Delete a store
  */
 exports.deleteStore = onCall({ region: "asia-south1" }, async (request) => {
-  await verifyAdmin(request.auth);
+  const adminData = await verifyAdmin(request.auth);
 
   const { storeId } = request.data;
 
@@ -167,6 +172,8 @@ exports.deleteStore = onCall({ region: "asia-south1" }, async (request) => {
   }
 
   await db.collection("stores").doc(storeId).delete();
+
+  logActivity({ module: "stores", action: "delete", entityId: storeId, entityName: storeDoc.data().name || storeId, performedBy: request.auth.uid, performedByEmail: adminData.email, performedByRole: adminData.role });
 
   return { storeId, message: "Store deleted successfully." };
 });

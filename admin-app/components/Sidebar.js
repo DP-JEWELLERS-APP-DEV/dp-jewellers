@@ -28,6 +28,7 @@ import {
   Store,
   ViewCarousel,
   PendingActions,
+  History,
 } from '@mui/icons-material';
 import { signOut } from 'firebase/auth';
 import { getFunctions, httpsCallable } from 'firebase/functions';
@@ -47,6 +48,7 @@ const menuItems = [
   { text: 'Stores', icon: <Store />, path: '/dashboard/stores', roles: ['super_admin'] },
   { text: 'Users', icon: <People />, path: '/dashboard/users', roles: ['super_admin'], permission: 'manageUsers' },
   { text: 'Manage Admins', icon: <AdminPanelSettings />, path: '/dashboard/admins', roles: ['super_admin'] },
+  { text: 'Activity Log', icon: <History />, path: '/dashboard/activity-log', roles: ['super_admin'] },
   { text: 'Support', icon: <Support />, path: '/dashboard/support', roles: ['super_admin', 'admin', 'editor'] },
 ];
 
