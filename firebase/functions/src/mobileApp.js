@@ -228,7 +228,7 @@ exports.getCart = onCall({ region: "asia-south1" }, async (request) => {
       if (item.selectedPurity && product.configurator?.enabled && rates) {
         const variantPricing = _calculateVariantPriceInternal(
           product, rates, taxSettings, makingChargesConfig,
-          item.selectedPurity, item.selectedDiamondQuality, item.size
+          item.selectedPurity, item.selectedDiamondQuality, item.size, item.selectedMetalType
         );
         finalPrice = variantPricing.finalPrice;
       }
@@ -236,6 +236,7 @@ exports.getCart = onCall({ region: "asia-south1" }, async (request) => {
       enrichedCart.push({
         productId: item.productId,
         size: item.size,
+        selectedMetalType: item.selectedMetalType || null,
         selectedPurity: item.selectedPurity || null,
         selectedColor: item.selectedColor || null,
         selectedDiamondQuality: item.selectedDiamondQuality || null,
@@ -257,7 +258,7 @@ exports.getCart = onCall({ region: "asia-south1" }, async (request) => {
 exports.updateCart = onCall({ region: "asia-south1" }, async (request) => {
   verifyAuth(request.auth);
 
-  const { action, productId, size, quantity, selectedPurity, selectedColor, selectedDiamondQuality } = request.data;
+  const { action, productId, size, quantity, selectedMetalType, selectedPurity, selectedColor, selectedDiamondQuality } = request.data;
 
   if (!action) {
     throw new HttpsError("invalid-argument", "action is required.");
@@ -285,6 +286,7 @@ exports.updateCart = onCall({ region: "asia-south1" }, async (request) => {
   const matchCartItem = (item) =>
     item.productId === productId &&
     item.size === (size || null) &&
+    (item.selectedMetalType || null) === (selectedMetalType || null) &&
     (item.selectedPurity || null) === (selectedPurity || null) &&
     (item.selectedColor || null) === (selectedColor || null) &&
     (item.selectedDiamondQuality || null) === (selectedDiamondQuality || null);
@@ -309,6 +311,7 @@ exports.updateCart = onCall({ region: "asia-south1" }, async (request) => {
         };
 
         // Store variant selections if provided
+        if (selectedMetalType) cartItem.selectedMetalType = selectedMetalType;
         if (selectedPurity) cartItem.selectedPurity = selectedPurity;
         if (selectedColor) cartItem.selectedColor = selectedColor;
         if (selectedDiamondQuality) cartItem.selectedDiamondQuality = selectedDiamondQuality;

@@ -191,13 +191,14 @@ const CartScreen = () => {
         )
     }
 
-    async function updateQty({ productId, size, selectedPurity, selectedColor, selectedDiamondQuality, quantity }) {
+    async function updateQty({ productId, size, selectedMetalType, selectedPurity, selectedColor, selectedDiamondQuality, quantity }) {
         try {
             const updateCart = httpsCallable(functions, 'updateCart');
             await updateCart({
                 action: 'update',
                 productId,
                 size: size || null,
+                selectedMetalType: selectedMetalType || null,
                 selectedPurity: selectedPurity || null,
                 selectedColor: selectedColor || null,
                 selectedDiamondQuality: selectedDiamondQuality || null,
@@ -210,13 +211,14 @@ const CartScreen = () => {
         }
     }
 
-    async function removeItem({ productId, size, selectedPurity, selectedColor, selectedDiamondQuality }) {
+    async function removeItem({ productId, size, selectedMetalType, selectedPurity, selectedColor, selectedDiamondQuality }) {
         try {
             const updateCart = httpsCallable(functions, 'updateCart');
             await updateCart({
                 action: 'remove',
                 productId,
                 size: size || null,
+                selectedMetalType: selectedMetalType || null,
                 selectedPurity: selectedPurity || null,
                 selectedColor: selectedColor || null,
                 selectedDiamondQuality: selectedDiamondQuality || null,
@@ -231,6 +233,9 @@ const CartScreen = () => {
     function cartItemsInfo() {
         const formatVariantInfo = (item) => {
             const parts = [];
+            if (item.selectedMetalType) {
+                parts.push(item.selectedMetalType.charAt(0).toUpperCase() + item.selectedMetalType.slice(1));
+            }
             if (item.size) parts.push(`Size: ${item.size}`);
             if (item.selectedPurity) parts.push(item.selectedPurity);
             if (item.selectedColor) {
@@ -279,6 +284,7 @@ const CartScreen = () => {
                                                 updateQty({
                                                     productId: item.productId,
                                                     size: item.size,
+                                                    selectedMetalType: item.selectedMetalType,
                                                     selectedPurity: item.selectedPurity,
                                                     selectedColor: item.selectedColor,
                                                     selectedDiamondQuality: item.selectedDiamondQuality,
@@ -299,6 +305,7 @@ const CartScreen = () => {
                                         updateQty({
                                             productId: item.productId,
                                             size: item.size,
+                                            selectedMetalType: item.selectedMetalType,
                                             selectedPurity: item.selectedPurity,
                                             selectedColor: item.selectedColor,
                                             selectedDiamondQuality: item.selectedDiamondQuality,
@@ -314,7 +321,7 @@ const CartScreen = () => {
                                 name="trash-2"
                                 size={18}
                                 color={Colors.blackColor}
-                                onPress={() => { removeItem({ productId: item.productId, size: item.size, selectedPurity: item.selectedPurity, selectedColor: item.selectedColor, selectedDiamondQuality: item.selectedDiamondQuality }) }}
+                                onPress={() => { removeItem({ productId: item.productId, size: item.size, selectedMetalType: item.selectedMetalType, selectedPurity: item.selectedPurity, selectedColor: item.selectedColor, selectedDiamondQuality: item.selectedDiamondQuality }) }}
                             />
                         </View>
                     </View>
@@ -325,7 +332,7 @@ const CartScreen = () => {
             <View style={{ marginTop: Sizes.fixPadding * 2.0, }}>
                 <FlatList
                     data={cart}
-                    keyExtractor={(item) => `${item.productId}-${item.size || 'na'}-${item.selectedPurity || ''}-${item.selectedDiamondQuality || ''}`}
+                    keyExtractor={(item) => `${item.productId}-${item.selectedMetalType || ''}-${item.size || 'na'}-${item.selectedPurity || ''}-${item.selectedDiamondQuality || ''}`}
                     renderItem={renderItem}
                     scrollEnabled={false}
                 />
