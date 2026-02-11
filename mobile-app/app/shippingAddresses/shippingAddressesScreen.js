@@ -1,5 +1,5 @@
-import { StyleSheet, Text, View, FlatList, TouchableOpacity, Image, ActivityIndicator, RefreshControl } from 'react-native'
-import React, { useState, useCallback } from 'react'
+import { StyleSheet, Text, View, FlatList, TouchableOpacity, Image, ActivityIndicator, RefreshControl, DeviceEventEmitter } from 'react-native'
+import React, { useState, useCallback, useEffect } from 'react'
 import { Colors, Fonts, Sizes, CommomStyles } from '../../constants/styles'
 import { MaterialIcons } from '@expo/vector-icons';
 import MyStatusBar from '../../components/myStatusBar';
@@ -39,6 +39,13 @@ const ShippingAddressesScreen = () => {
             fetchAddresses();
         }, [])
     );
+
+    useEffect(() => {
+        const subscription = DeviceEventEmitter.addListener('addressesUpdated', () => {
+            fetchAddresses();
+        });
+        return () => subscription.remove();
+    }, []);
 
     const fetchAddresses = async () => {
         try {
@@ -138,6 +145,39 @@ const ShippingAddressesScreen = () => {
                 <Text style={{ lineHeight: 23.0, ...Fonts.grayColor15Regular }}>
                     {formatAddress(item)}
                 </Text>
+                <View style={styles.addressActionsRow}>
+                    <TouchableOpacity
+                        activeOpacity={0.7}
+                        onPress={() => {
+                            navigation.push('addNewAddress/addNewAddressScreen', {
+                                mode: 'edit',
+                                addressIndex: index,
+                                address: JSON.stringify(item),
+                            });
+                        }}
+                        style={styles.addressActionButton}
+                    >
+                        <Text style={styles.addressActionText}>Edit</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        activeOpacity={0.7}
+                        onPress={async () => {
+                            try {
+                                const manageAddress = httpsCallable(functions, 'manageAddress');
+                                await manageAddress({
+                                    action: 'delete',
+                                    addressIndex: index,
+                                });
+                                fetchAddresses();
+                            } catch (err) {
+                                console.log('Error deleting address:', err);
+                            }
+                        }}
+                        style={styles.addressActionButton}
+                    >
+                        <Text style={styles.addressActionText}>Delete</Text>
+                    </TouchableOpacity>
+                </View>
             </View>
         )
         return (
@@ -206,5 +246,20 @@ const styles = StyleSheet.create({
         paddingHorizontal: Sizes.fixPadding,
         paddingVertical: 2,
         borderRadius: 4,
+    },
+    addressActionsRow: {
+        flexDirection: 'row',
+        marginTop: Sizes.fixPadding,
+    },
+    addressActionButton: {
+        borderWidth: 1.0,
+        borderColor: Colors.blackColor,
+        borderRadius: Sizes.fixPadding - 2.0,
+        paddingHorizontal: Sizes.fixPadding + 5.0,
+        paddingVertical: Sizes.fixPadding - 6.0,
+        marginRight: Sizes.fixPadding,
+    },
+    addressActionText: {
+        ...Fonts.blackColor14Medium,
     },
 })

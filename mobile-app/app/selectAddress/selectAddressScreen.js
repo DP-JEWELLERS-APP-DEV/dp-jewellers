@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View, FlatList, TouchableOpacity, Image, ActivityIndicator, RefreshControl } from 'react-native'
+import { StyleSheet, Text, View, FlatList, TouchableOpacity, Image, ActivityIndicator, RefreshControl, DeviceEventEmitter } from 'react-native'
 import React, { useState, useEffect, useCallback } from 'react'
 import { Colors, Fonts, Sizes, CommomStyles } from '../../constants/styles'
 import { MaterialIcons, Feather } from '@expo/vector-icons';
@@ -43,6 +43,13 @@ const SelectAddressScreen = () => {
             fetchAddresses();
         }, [])
     );
+
+    useEffect(() => {
+        const subscription = DeviceEventEmitter.addListener('addressesUpdated', () => {
+            fetchAddresses();
+        });
+        return () => subscription.remove();
+    }, []);
 
     const fetchAddresses = async () => {
         try {
@@ -181,7 +188,7 @@ const SelectAddressScreen = () => {
                         )}
                     </View>
                     <Text numberOfLines={1} style={{ lineHeight: 23.0, ...Fonts.grayColor15Regular }}>
-                        {item.name} | {item.phone || item.mobileNo}
+                        {item.name} | {item.phone || item.mobileNo || item.contactNumber}
                     </Text>
                     <Text style={{ lineHeight: 23.0, ...Fonts.grayColor15Regular }}>
                         {formatAddress(item)}

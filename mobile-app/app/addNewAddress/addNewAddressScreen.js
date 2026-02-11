@@ -1,5 +1,5 @@
-import { StyleSheet, Text, View, TextInput, ScrollView, TouchableOpacity, ActivityIndicator, Alert } from 'react-native'
-import React, { useEffect, useState } from 'react'
+import { StyleSheet, Text, View, TextInput, ScrollView, TouchableOpacity, ActivityIndicator, Alert, Keyboard, DeviceEventEmitter } from 'react-native'
+import React, { useEffect, useRef, useState } from 'react'
 import { Colors, Fonts, Sizes, CommomStyles } from '../../constants/styles'
 import { MaterialIcons } from '@expo/vector-icons';
 import SelectDropdown from 'react-native-select-dropdown'
@@ -29,8 +29,10 @@ const AddNewAddressScreen = () => {
     const [isDefault, setIsDefault] = useState(false);
     const [initialIsDefault, setInitialIsDefault] = useState(false);
     const [saving, setSaving] = useState(false);
+    const isMounted = useRef(true);
 
     useEffect(() => {
+        isMounted.current = true;
         if (mode !== 'edit' || !params.address) return;
         try {
             const parsed = JSON.parse(params.address);
@@ -49,44 +51,69 @@ const AddNewAddressScreen = () => {
         } catch (err) {
             // Ignore parse errors
         }
+        return () => {
+            isMounted.current = false;
+        };
     }, [mode, params.address]);
 
-    const validateForm = () => {
+    const validateForm = ({ silent = false } = {}) => {
         if (!name.trim()) {
-            Alert.alert('Error', 'Please enter your name');
+            if (!silent) Alert.alert('Error', 'Please enter your name');
             return false;
         }
         if (!phone.trim() || phone.length < 10) {
-            Alert.alert('Error', 'Please enter a valid phone number');
+            if (!silent) Alert.alert('Error', 'Please enter a valid phone number');
             return false;
         }
         if (!addressLine1.trim()) {
-            Alert.alert('Error', 'Please enter your address');
+            if (!silent) Alert.alert('Error', 'Please enter your address');
             return false;
         }
         if (!city.trim()) {
-            Alert.alert('Error', 'Please enter your city');
+            if (!silent) Alert.alert('Error', 'Please enter your city');
             return false;
         }
         if (!state.trim()) {
-            Alert.alert('Error', 'Please enter your state');
+            if (!silent) Alert.alert('Error', 'Please enter your state');
             return false;
         }
         if (!pincode.trim() || pincode.length !== 6) {
-            Alert.alert('Error', 'Please enter a valid 6-digit pincode');
+            if (!silent) Alert.alert('Error', 'Please enter a valid 6-digit pincode');
             return false;
         }
         if (!addressType) {
-            Alert.alert('Error', 'Please select address type');
+            if (!silent) Alert.alert('Error', 'Please select address type');
             return false;
         }
         return true;
     };
 
-    const handleAddAddress = async () => {
-        if (!validateForm()) return;
+    const closeScreen = () => {
+        try {
+            if (navigation?.canGoBack && navigation.canGoBack()) {
+                navigation.goBack();
+                return;
+            }
+        } catch (err) {
+            // ignore
+        }
+        try {
+            router.back();
+        } catch (err) {
+            // ignore
+        }
+    };
 
-        setSaving(true);
+    const handleAddAddress = async ({ closeImmediately = false, silent = false, skipValidation = false } = {}) => {
+        Keyboard.dismiss();
+        if (!skipValidation && !validateForm({ silent })) return;
+
+        if (isMounted.current) {
+            setSaving(true);
+        }
+        if (closeImmediately) {
+            closeScreen();
+        }
         try {
             const manageAddress = httpsCallable(functions, 'manageAddress');
             if (mode === 'edit' && addressIndex !== null && !Number.isNaN(addressIndex)) {
@@ -127,14 +154,22 @@ const AddNewAddressScreen = () => {
                 });
             }
 
-            Alert.alert('Success', mode === 'edit' ? 'Address updated successfully' : 'Address added successfully', [
-                { text: 'OK', onPress: () => navigation.pop() }
-            ]);
+            DeviceEventEmitter.emit('addressesUpdated');
+
+            if (isMounted.current && !silent) {
+                Alert.alert('Success', mode === 'edit' ? 'Address updated successfully' : 'Address added successfully', [
+                    { text: 'OK', onPress: () => closeScreen() }
+                ]);
+            }
         } catch (err) {
             console.log('Error adding address:', err);
-            Alert.alert('Error', err.message || 'Failed to save address. Please try again.');
+            if (isMounted.current && !silent) {
+                Alert.alert('Error', err.message || 'Failed to save address. Please try again.');
+            }
         } finally {
-            setSaving(false);
+            if (isMounted.current) {
+                setSaving(false);
+            }
         }
     };
 
@@ -145,6 +180,7 @@ const AddNewAddressScreen = () => {
                 {header()}
                 <ScrollView
                     automaticallyAdjustKeyboardInsets={true}
+                    keyboardShouldPersistTaps="handled"
                     showsVerticalScrollIndicator={false}
                     contentContainerStyle={{ paddingBottom: Sizes.fixPadding * 2 }}
                 >
@@ -183,7 +219,15 @@ const AddNewAddressScreen = () => {
         return (
             <TouchableOpacity
                 activeOpacity={0.8}
-                onPress={handleAddAddress}
+                onPress={() => {
+                    const isValid = validateForm({ silent: true });
+                    if (!isValid) {
+                        validateForm();
+                        return;
+                    }
+                    closeScreen();
+                    handleAddAddress({ silent: true, skipValidation: true });
+                }}
                 disabled={saving}
                 style={[CommomStyles.buttonStyle, saving && { backgroundColor: Colors.lightGrayColor }]}
             >

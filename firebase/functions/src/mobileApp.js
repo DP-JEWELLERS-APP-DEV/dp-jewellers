@@ -489,19 +489,42 @@ exports.manageAddress = onCall({ region: "asia-south1" }, async (request) => {
 
   let addresses = userDoc.data().addresses || [];
 
+  const normalizeAddress = (payload = {}) => {
+    const phone = payload.phone || payload.contactNumber || payload.mobileNo || "";
+    const addressLine1 = payload.addressLine1 || payload.completeAddress || payload.address || "";
+    const addressLine2 = payload.addressLine2 || payload.areaName || "";
+
+    return {
+      addressType: payload.addressType || "home",
+      name: payload.name || "",
+      phone,
+      contactNumber: phone,
+      addressLine1,
+      addressLine2,
+      areaName: addressLine2,
+      city: payload.city || "",
+      state: payload.state || "",
+      pincode: payload.pincode || "",
+      completeAddress: addressLine1,
+      isDefault: Boolean(payload.isDefault),
+    };
+  };
+
   switch (action) {
     case "add": {
       if (!address) {
         throw new HttpsError("invalid-argument", "address object is required for add action.");
       }
 
+      const normalized = normalizeAddress(address);
+      const isDefault = addresses.length === 0 || normalized.isDefault;
+      if (isDefault) {
+        addresses = addresses.map((addr) => ({ ...addr, isDefault: false }));
+      }
+
       const newAddress = {
-        addressType: address.addressType || "home",
-        name: address.name || "",
-        contactNumber: address.contactNumber || "",
-        areaName: address.areaName || "",
-        completeAddress: address.completeAddress || "",
-        isDefault: addresses.length === 0, // First address is default
+        ...normalized,
+        isDefault,
         createdAt: new Date().toISOString(),
       };
 
@@ -517,11 +540,14 @@ exports.manageAddress = onCall({ region: "asia-south1" }, async (request) => {
         throw new HttpsError("invalid-argument", "address object is required for update action.");
       }
 
-      addresses[addressIndex] = {
+      const normalized = normalizeAddress(address);
+      const nextAddress = {
         ...addresses[addressIndex],
-        ...address,
+        ...normalized,
         createdAt: addresses[addressIndex].createdAt, // Preserve original createdAt
       };
+      delete nextAddress.isDefault;
+      addresses[addressIndex] = nextAddress;
       break;
     }
 
