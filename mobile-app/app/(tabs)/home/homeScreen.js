@@ -286,9 +286,7 @@ const HomeScreen = () => {
         )
         return (
             <View style={{ marginVertical: Sizes.fixPadding }}>
-                <Text style={{ marginHorizontal: Sizes.fixPadding * 2.0, ...Fonts.blackColor18SemiBold }}>
-                    Category
-                </Text>
+               
                 <FlatList
                     data={categories}
                     keyExtractor={(item, index) => `${item}-${index}`}
