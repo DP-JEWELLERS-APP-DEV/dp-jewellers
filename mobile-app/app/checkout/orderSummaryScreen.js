@@ -10,8 +10,8 @@ import RazorpayCheckout from 'react-native-razorpay';
 
 const placeholderImage = require('../../assets/images/jewellery/jewellary1.png');
 
-// Razorpay Key - Replace with your actual key
-const RAZORPAY_KEY = 'rzp_test_YOUR_KEY_ID'; // Use rzp_live_XXX for production
+// Razorpay Key Id (public) - set in .env as EXPO_PUBLIC_RAZORPAY_KEY_ID
+const RAZORPAY_KEY = process.env.EXPO_PUBLIC_RAZORPAY_KEY_ID; // Use rzp_live_XXX for production
 
 const OrderSummaryScreen = () => {
 
@@ -81,6 +81,11 @@ const OrderSummaryScreen = () => {
     const handlePayment = async () => {
         if (isPickup && paymentOption === 'custom' && !isCustomAmountValid) {
             Alert.alert('Invalid Amount', `Please enter an amount between ₹${minPayment.toLocaleString('en-IN')} (10%) and ₹${cartTotal.toLocaleString('en-IN')}.`);
+            return;
+        }
+
+        if (!RAZORPAY_KEY) {
+            Alert.alert('Payment Unavailable', 'Razorpay key is missing. Please set EXPO_PUBLIC_RAZORPAY_KEY_ID in the app environment.');
             return;
         }
 
