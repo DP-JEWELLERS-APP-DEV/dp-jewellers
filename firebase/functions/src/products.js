@@ -1,6 +1,6 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
-const { _computePriceRange } = require("./priceCalculation");
+const { _calculateVariantPriceInternal, _computePriceRange, _getDefaultPricing } = require("./priceCalculation");
 const { requiresApproval } = require("./approvalUtils");
 const { logActivity } = require("./activityLog");
 
@@ -81,9 +81,6 @@ exports.createProduct = onCall({ region: "asia-south1" }, async (request) => {
     throw new HttpsError("already-exists", `Product code ${data.productCode} already exists.`);
   }
 
-  // Calculate initial price
-  const pricing = await calculatePricing(data);
-
   const product = {
     productCode: data.productCode,
     name: data.name,
@@ -91,15 +88,10 @@ exports.createProduct = onCall({ region: "asia-south1" }, async (request) => {
     category: data.category,
     subCategory: data.subCategory || "",
     images: data.images || [],
-    metal: data.metal || {},
-    metals: data.metals || [],
     diamond: data.diamond || { hasDiamond: false },
     gemstones: data.gemstones || [],
     dimensions: data.dimensions || {},
-    goldOptions: data.goldOptions || [],
-    sizes: data.sizes || [],
     tax: data.tax || {},
-    pricing: pricing,
     certifications: data.certifications || {},
     policies: data.policies || {
       freeShipping: true,
@@ -135,23 +127,23 @@ exports.createProduct = onCall({ region: "asia-south1" }, async (request) => {
     purchaseCount: 0,
   };
 
-  // Store configurator if provided
+  // Store configurator
   if (data.configurator) {
     product.configurator = data.configurator;
   }
 
-  // Compute priceRange for configurator-enabled products
-  if (data.configurator?.enabled) {
-    const [ratesDoc, taxDoc, makingChargesDoc] = await Promise.all([
-      db.collection("metalRates").doc("current").get(),
-      db.collection("taxSettings").doc("current").get(),
-      db.collection("makingCharges").doc("current").get(),
-    ]);
-    const rates = ratesDoc.exists ? ratesDoc.data() : {};
-    const taxSettings = taxDoc.exists ? taxDoc.data() : { gst: { jewelry: 3 } };
-    const makingChargesConfig = makingChargesDoc.exists ? makingChargesDoc.data() : {};
-    product.priceRange = _computePriceRange(product, rates, taxSettings, makingChargesConfig);
-  }
+  // Compute pricing and priceRange from configurator
+  const [ratesDoc, taxDoc, makingChargesDoc] = await Promise.all([
+    db.collection("metalRates").doc("current").get(),
+    db.collection("taxSettings").doc("current").get(),
+    db.collection("makingCharges").doc("current").get(),
+  ]);
+  const rates = ratesDoc.exists ? ratesDoc.data() : {};
+  const taxSettings = taxDoc.exists ? taxDoc.data() : { gst: { jewelry: 3 } };
+  const makingChargesConfig = makingChargesDoc.exists ? makingChargesDoc.data() : {};
+
+  product.pricing = _getDefaultPricing(product, rates, taxSettings, makingChargesConfig) || {};
+  product.priceRange = _computePriceRange(product, rates, taxSettings, makingChargesConfig);
 
   if (requiresApproval(adminData)) {
     // Create product in pending state (not visible to customers)
@@ -214,36 +206,26 @@ exports.updateProduct = onCall({ region: "asia-south1" }, async (request) => {
     throw new HttpsError("not-found", "Product not found.");
   }
 
-  // If metal/diamond/pricing fields changed, recalculate price
   const existingData = productDoc.data();
-  const mergedData = { ...existingData, ...updateData };
-
-  if (updateData.metal || updateData.diamond || updateData.pricing || updateData.tax) {
-    updateData.pricing = await calculatePricing(mergedData);
-  }
 
   // Sync isActive with status if status changed
   if (updateData.status) {
     updateData.isActive = updateData.status === "active" || updateData.status === "coming_soon";
   }
 
-  // Recompute priceRange if configurator or pricing-related fields changed
+  // Always recalculate pricing from configurator
   const finalConfigurator = updateData.configurator || existingData.configurator;
-  if (finalConfigurator?.enabled) {
-    const mergedForRange = { ...existingData, ...updateData, configurator: finalConfigurator };
-    const [ratesDoc, taxDoc, makingChargesDoc] = await Promise.all([
-      db.collection("metalRates").doc("current").get(),
-      db.collection("taxSettings").doc("current").get(),
-      db.collection("makingCharges").doc("current").get(),
-    ]);
-    const rates = ratesDoc.exists ? ratesDoc.data() : {};
-    const taxSettings = taxDoc.exists ? taxDoc.data() : { gst: { jewelry: 3 } };
-    const makingChargesConfig = makingChargesDoc.exists ? makingChargesDoc.data() : {};
-    updateData.priceRange = _computePriceRange(mergedForRange, rates, taxSettings, makingChargesConfig);
-  } else if (updateData.configurator && !updateData.configurator.enabled) {
-    // Configurator was disabled - clear priceRange
-    updateData.priceRange = admin.firestore.FieldValue.delete();
-  }
+  const mergedProduct = { ...existingData, ...updateData, configurator: finalConfigurator };
+  const [ratesDoc, taxDoc, makingChargesDoc] = await Promise.all([
+    db.collection("metalRates").doc("current").get(),
+    db.collection("taxSettings").doc("current").get(),
+    db.collection("makingCharges").doc("current").get(),
+  ]);
+  const rates = ratesDoc.exists ? ratesDoc.data() : {};
+  const taxSettings = taxDoc.exists ? taxDoc.data() : { gst: { jewelry: 3 } };
+  const makingChargesConfig = makingChargesDoc.exists ? makingChargesDoc.data() : {};
+  updateData.pricing = _getDefaultPricing(mergedProduct, rates, taxSettings, makingChargesConfig) || existingData.pricing;
+  updateData.priceRange = _computePriceRange(mergedProduct, rates, taxSettings, makingChargesConfig);
 
   if (requiresApproval(adminData)) {
     // Store changes in pendingApprovals only — live product unchanged
@@ -465,7 +447,6 @@ exports.listProducts = onCall({ region: "asia-south1" }, async (request) => {
 
   if (category) query = query.where("category", "==", category);
   if (subCategory) query = query.where("subCategory", "==", subCategory);
-  if (metalType) query = query.where("metal.type", "==", metalType);
   if (featured) query = query.where("featured", "==", true);
   if (bestseller) query = query.where("bestseller", "==", true);
   if (newArrival) query = query.where("newArrival", "==", true);
@@ -509,200 +490,3 @@ exports.listProducts = onCall({ region: "asia-south1" }, async (request) => {
   };
 });
 
-/**
- * Resolve making/wastage charge for a product.
- * Priority: product-level override > category override > global default
- */
-function resolveMakingCharge(product, makingChargesConfig) {
-  const pricing = product.pricing || {};
-  const category = product.category || "";
-
-  // 1. Product-level override
-  if (pricing.makingChargeValue != null && pricing.makingChargeValue !== "") {
-    return {
-      mcType: pricing.makingChargeType || "percentage",
-      mcValue: pricing.makingChargeValue,
-    };
-  }
-
-  // 2. Category-specific override
-  const charges = makingChargesConfig.charges || [];
-  const categoryOverride = charges.find(
-    (c) => c.jewelryType && c.jewelryType.toLowerCase() === category.toLowerCase()
-  );
-
-  if (categoryOverride) {
-    return {
-      mcType: categoryOverride.chargeType || "percentage",
-      mcValue: categoryOverride.value || 0,
-    };
-  }
-
-  // 3. Global default
-  const globalDefault = makingChargesConfig.globalDefault || {};
-  return {
-    mcType: globalDefault.chargeType || "percentage",
-    mcValue: globalDefault.value || 0,
-  };
-}
-
-function resolveWastageCharge(product, makingChargesConfig) {
-  const pricing = product.pricing || {};
-
-  // 1. Product-level override
-  if (pricing.wastageChargeValue != null && pricing.wastageChargeValue !== "") {
-    return {
-      wcType: pricing.wastageChargeType || "percentage",
-      wcValue: pricing.wastageChargeValue,
-    };
-  }
-
-  // 2. Global wastage default
-  const globalWastage = makingChargesConfig.globalWastage || {};
-  return {
-    wcType: globalWastage.chargeType || "percentage",
-    wcValue: globalWastage.value || 0,
-  };
-}
-
-/**
- * Calculate pricing based on current metal rates and making charges config
- */
-async function calculatePricing(productData) {
-  const [ratesDoc, taxDoc, makingChargesDoc] = await Promise.all([
-    db.collection("metalRates").doc("current").get(),
-    db.collection("taxSettings").doc("current").get(),
-    db.collection("makingCharges").doc("current").get(),
-  ]);
-
-  const rates = ratesDoc.exists ? ratesDoc.data() : {};
-  const taxSettings = taxDoc.exists ? taxDoc.data() : { gst: { jewelry: 3 } };
-  const makingChargesConfig = makingChargesDoc.exists ? makingChargesDoc.data() : {};
-
-  const metal = productData.metal || {};
-  const diamond = productData.diamond || {};
-  const pricing = productData.pricing || {};
-
-  // Calculate metal value
-  let metalValue = 0;
-  let ratePerGram = 0;
-
-  if (metal.type === "gold" && metal.purity && rates.gold) {
-    ratePerGram = rates.gold[metal.purity] || 0;
-    metalValue = (metal.netWeight || 0) * ratePerGram;
-  } else if (metal.type === "silver" && metal.silverType && rates.silver) {
-    ratePerGram = rates.silver[metal.silverType] || 0;
-    metalValue = (metal.netWeight || 0) * ratePerGram;
-  } else if (metal.type === "platinum" && rates.platinum) {
-    ratePerGram = rates.platinum.perGram || 0;
-    metalValue = (metal.netWeight || 0) * ratePerGram;
-  }
-
-  // Calculate diamond value
-  let diamondValue = 0;
-  let diamondRatePerCarat = 0;
-
-  if (diamond.hasDiamond && rates.diamond) {
-    const clarityMap = { FL: "IF", IF: "IF", VVS1: "VVS", VVS2: "VVS", VS1: "VS", VS2: "VS", SI1: "SI", SI2: "SI" };
-    const colorMap = { D: "DEF", E: "DEF", F: "DEF", G: "GH", H: "GH", I: "IJ", J: "IJ" };
-
-    if (diamond.variants && diamond.variants.length > 0) {
-      // Per-variant calculation: each variant has its own clarity/color/rate
-      for (const variant of diamond.variants) {
-        const vClarity = clarityMap[variant.clarity] || clarityMap[diamond.clarity] || "SI";
-        const vColor = colorMap[variant.color] || colorMap[diamond.color] || "IJ";
-        const vRateKey = `${vClarity}_${vColor}`;
-        const vRate = rates.diamond[vRateKey] || rates.diamond["SI_IJ"] || 25000;
-        diamondValue += (variant.caratWeight || 0) * vRate;
-      }
-      // Use the first variant's rate as the representative rate
-      const firstClarity = clarityMap[diamond.variants[0].clarity] || "SI";
-      const firstColor = colorMap[diamond.variants[0].color] || "IJ";
-      diamondRatePerCarat = rates.diamond[`${firstClarity}_${firstColor}`] || rates.diamond["SI_IJ"] || 25000;
-    } else {
-      // Legacy: single clarity/color at diamond level
-      const clarityKey = clarityMap[diamond.clarity] || "SI";
-      const colorKey = colorMap[diamond.color] || "IJ";
-      const rateKey = `${clarityKey}_${colorKey}`;
-      diamondRatePerCarat = rates.diamond[rateKey] || rates.diamond["SI_IJ"] || 25000;
-      const totalCaratWeight = diamond.totalCaratWeight || 0;
-      diamondValue = totalCaratWeight * diamondRatePerCarat;
-    }
-  }
-
-  // Calculate gemstone value
-  let gemstoneValue = 0;
-  if (productData.gemstones && productData.gemstones.length > 0) {
-    gemstoneValue = pricing.gemstoneValue || 0;
-  }
-
-  // Making charges: product > category override > global default
-  const { mcType, mcValue } = resolveMakingCharge(productData, makingChargesConfig);
-  let makingChargeAmount = 0;
-
-  if (mcType === "percentage") {
-    makingChargeAmount = metalValue * (mcValue / 100);
-  } else if (mcType === "flat_per_gram") {
-    makingChargeAmount = (metal.netWeight || 0) * mcValue;
-  } else if (mcType === "fixed_amount") {
-    makingChargeAmount = mcValue;
-  }
-
-  // Wastage charges: product > global default
-  const { wcType, wcValue } = resolveWastageCharge(productData, makingChargesConfig);
-  let wastageChargeAmount = 0;
-
-  if (wcType === "percentage") {
-    wastageChargeAmount = metalValue * (wcValue / 100);
-  } else {
-    wastageChargeAmount = wcValue;
-  }
-
-  const stoneSettingCharges = pricing.stoneSettingCharges || 0;
-  const designCharges = pricing.designCharges || 0;
-
-  const subtotal = metalValue + diamondValue + gemstoneValue +
-    makingChargeAmount + wastageChargeAmount + stoneSettingCharges + designCharges;
-
-  const discount = pricing.discount || 0;
-
-  // Use product-level tax if set, otherwise fall back to global tax settings
-  const productTax = productData.tax || {};
-  const jewelryTaxRate = productTax.jewelryGst || taxSettings.gst?.jewelry || 3;
-  const makingTaxRate = productTax.makingGst || taxSettings.gst?.makingCharges || 5;
-
-  const jewelryTaxableAmount = metalValue + diamondValue + gemstoneValue;
-  const labourTaxableAmount = makingChargeAmount + wastageChargeAmount + stoneSettingCharges + designCharges;
-
-  const jewelryTaxAmount = jewelryTaxableAmount * (jewelryTaxRate / 100);
-  const labourTaxAmount = labourTaxableAmount * (makingTaxRate / 100);
-  const totalTaxAmount = jewelryTaxAmount + labourTaxAmount;
-  const finalPrice = Math.round(subtotal - discount + totalTaxAmount);
-
-  return {
-    goldRatePerGram: metal.type === "gold" ? ratePerGram : 0,
-    silverRatePerGram: metal.type === "silver" ? ratePerGram : 0,
-    diamondRatePerCarat,
-    makingChargeType: mcType,
-    makingChargeValue: mcValue,
-    makingChargeAmount: Math.round(makingChargeAmount),
-    wastageChargeType: wcType,
-    wastageChargeValue: wcValue,
-    wastageChargeAmount: Math.round(wastageChargeAmount),
-    stoneSettingCharges,
-    designCharges,
-    metalValue: Math.round(metalValue),
-    diamondValue: Math.round(diamondValue),
-    gemstoneValue,
-    subtotal: Math.round(subtotal),
-    discount,
-    jewelryTaxRate,
-    makingTaxRate,
-    jewelryTaxAmount: Math.round(jewelryTaxAmount),
-    labourTaxAmount: Math.round(labourTaxAmount),
-    taxAmount: Math.round(totalTaxAmount),
-    finalPrice,
-    mrp: pricing.mrp || finalPrice,
-    sellingPrice: finalPrice,
-  };
-}

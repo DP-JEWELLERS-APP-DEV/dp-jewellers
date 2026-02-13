@@ -81,7 +81,7 @@ const ProductDetailScreen = () => {
                     setproduct(res.data);
                     const cfg = res.data?.configurator;
                     const metals = getConfigurableMetals(cfg);
-                    if (cfg?.enabled && metals.length > 0) {
+                    if (metals.length > 0) {
                         const defaultMType = getDefaultMetalType(cfg);
                         setSelectedMetalType(defaultMType);
                         const defaultMetal = metals.find(m => m.type === defaultMType) || metals[0];
@@ -90,20 +90,16 @@ const ProductDetailScreen = () => {
                         const defaultVariant = defaultMetal.variants?.find(v => v.purity === defaultPurity) || defaultMetal.variants?.[0];
                         if (defaultVariant) {
                             setSelectedDiamondQuality(defaultVariant.defaultDiamondQuality || '');
-                            setSelectedGoldOption(defaultVariant.defaultColor || '');
+                            setSelectedGoldOption(defaultVariant.availableColors?.[0] || defaultVariant.defaultColor || '');
                             setselectedSize(defaultVariant.defaultSize || '');
                         }
                     } else {
-                        if (res.data?.defaultSize) {
-                            setselectedSize(res.data.defaultSize);
-                        } else if (res.data?.sizes?.length) {
-                            setselectedSize(res.data.sizes[0]);
-                        }
-                        // Set default gold option
-                        const goldOptions = res.data?.goldOptions || res.data?.metals?.[0]?.goldOptions || [];
-                        if (goldOptions.length > 0) {
-                            setSelectedGoldOption(goldOptions[0]);
-                        }
+                        // Fallback for products with no configurator metals
+                        setSelectedMetalType('');
+                        setSelectedPurity('');
+                        setSelectedGoldOption('');
+                        setselectedSize('');
+                        setSelectedDiamondQuality('');
                     }
                 }
             } catch (err) {
@@ -208,21 +204,17 @@ const ProductDetailScreen = () => {
     };
 
     useEffect(() => {
-        if (!product?.configurator?.enabled) {
-            setVariantPricing(null);
-            return;
-        }
+        if (!product) return;
         if (!selectedPurity) return;
         const t = setTimeout(() => {
             fetchVariantPrice(selectedMetalType, selectedPurity, selectedDiamondQuality, selectedSize);
         }, 300);
         return () => clearTimeout(t);
-    }, [product?.configurator?.enabled, selectedMetalType, selectedPurity, selectedDiamondQuality, selectedSize, productId]);
+    }, [product, selectedMetalType, selectedPurity, selectedDiamondQuality, selectedSize, productId]);
 
     // Helper: get the current metal entry for the selected metal type
     const getCurrentMetalEntry = () => {
         const cfg = product?.configurator;
-        if (!cfg?.enabled) return null;
         const metals = getConfigurableMetals(cfg);
         return metals.find(m => m.type === selectedMetalType) || metals[0] || null;
     };
@@ -239,7 +231,7 @@ const ProductDetailScreen = () => {
     // Cascade selections when metal type changes
     useEffect(() => {
         const cfg = product?.configurator;
-        if (!cfg?.enabled || !selectedMetalType) return;
+        if (!selectedMetalType) return;
         const metals = getConfigurableMetals(cfg);
         const metalEntry = metals.find(m => m.type === selectedMetalType);
         if (!metalEntry) return;
@@ -258,8 +250,6 @@ const ProductDetailScreen = () => {
 
     // Cascade selections when purity changes
     useEffect(() => {
-        const cfg = product?.configurator;
-        if (!cfg?.enabled) return;
         const metalEntry = getCurrentMetalEntry();
         if (!metalEntry) return;
         const variant = metalEntry.variants?.find(v => v.purity === selectedPurity);
@@ -505,9 +495,6 @@ const ProductDetailScreen = () => {
     }
 
     function metalDetailsSection() {
-        const metals = product?.metals || [];
-        const metal = product?.metal || metals[0] || {};
-        const isConfigurator = product?.configurator?.enabled;
         const metalBreakdown = variantPricing?.metalBreakdown || [];
 
         const formatMetalType = (type, purity) => {
@@ -538,7 +525,7 @@ const ProductDetailScreen = () => {
                 </TouchableOpacity>
                 {showMetalDetails && (
                     <View style={styles.collapsibleContent}>
-                        {isConfigurator && metalBreakdown.length > 0 ? (
+                        {metalBreakdown.length > 0 ? (
                             metalBreakdown.map((m, idx) => (
                                 <View key={idx}>
                                     {idx > 0 && <View style={styles.metalDivider} />}
@@ -556,32 +543,9 @@ const ProductDetailScreen = () => {
                                     />
                                 </View>
                             ))
-                        ) : metals.length > 1 ? (
-                            metals.map((m, idx) => (
-                                <View key={idx}>
-                                    {idx > 0 && <View style={styles.metalDivider} />}
-                                    <DetailRow
-                                        label="Type"
-                                        value={formatMetalType(m.type, m.purity || m.silverType)}
-                                    />
-                                    <DetailRow
-                                        label="Weight"
-                                        value={m.netWeight ? `${m.netWeight} gram` : '-'}
-                                    />
-                                </View>
-                            ))
-                        ) : (
-                            <>
-                                <DetailRow
-                                    label="Type"
-                                    value={formatMetalType(metal.type, metal.purity || metal.silverType)}
-                                />
-                                <DetailRow
-                                    label="Weight"
-                                    value={metal.netWeight ? `${metal.netWeight} gram` : '-'}
-                                />
-                            </>
-                        )}
+                        ) : pricingLoading ? (
+                            <ActivityIndicator size="small" color={Colors.primaryColor} style={{ marginVertical: Sizes.fixPadding }} />
+                        ) : null}
                     </View>
                 )}
             </View>
@@ -686,7 +650,6 @@ const ProductDetailScreen = () => {
 
     function metalTypeSelector() {
         const cfg = product?.configurator;
-        if (!cfg?.enabled) return null;
         const metals = getConfigurableMetals(cfg);
         if (metals.length <= 1) return null;
 
@@ -725,8 +688,6 @@ const ProductDetailScreen = () => {
     }
 
     function puritySelector() {
-        const cfg = product?.configurator;
-        if (!cfg?.enabled) return null;
         const metalEntry = getCurrentMetalEntry();
         if (!metalEntry) return null;
         const variants = metalEntry.variants || [];
@@ -738,32 +699,39 @@ const ProductDetailScreen = () => {
                     Metal Purity
                 </Text>
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
-                    {variants.map((v) => (
-                        <TouchableOpacity
-                            key={v.purity}
-                            activeOpacity={0.8}
-                            onPress={() => setSelectedPurity(v.purity)}
-                            style={[
-                                styles.pillChip,
-                                selectedPurity === v.purity && styles.pillChipSelected
-                            ]}
-                        >
-                            <Text style={[
-                                styles.pillChipText,
-                                selectedPurity === v.purity && styles.pillChipTextSelected
-                            ]}>
-                                {v.purity}
+                    {variants.length <= 1 ? (
+                        <View style={[styles.pillChip, styles.pillChipSelected]}>
+                            <Text style={styles.pillChipTextSelected}>
+                                {variants[0].purity}
                             </Text>
-                        </TouchableOpacity>
-                    ))}
+                        </View>
+                    ) : (
+                        variants.map((v) => (
+                            <TouchableOpacity
+                                key={v.purity}
+                                activeOpacity={0.8}
+                                onPress={() => setSelectedPurity(v.purity)}
+                                style={[
+                                    styles.pillChip,
+                                    selectedPurity === v.purity && styles.pillChipSelected
+                                ]}
+                            >
+                                <Text style={[
+                                    styles.pillChipText,
+                                    selectedPurity === v.purity && styles.pillChipTextSelected
+                                ]}>
+                                    {v.purity}
+                                </Text>
+                            </TouchableOpacity>
+                        ))
+                    )}
                 </View>
             </View>
         )
     }
 
     function diamondQualitySelector() {
-        const cfg = product?.configurator;
-        if (!cfg?.enabled || !product?.diamond?.hasDiamond) return null;
+        if (!product?.diamond?.hasDiamond) return null;
         const variant = getCurrentVariant();
         const qualities = variant?.availableDiamondQualities || [];
         if (qualities.length <= 1) return null;
@@ -799,15 +767,12 @@ const ProductDetailScreen = () => {
     }
 
     function goldOptionsInfo() {
-        const cfg = product?.configurator;
         let goldOptions;
-        if (cfg?.enabled && selectedMetalType === 'gold') {
+        if (selectedMetalType === 'gold') {
             const variant = getCurrentVariant();
             goldOptions = variant?.availableColors || [];
-        } else if (cfg?.enabled && selectedMetalType !== 'gold') {
-            goldOptions = [];
         } else {
-            goldOptions = product?.goldOptions || product?.metals?.[0]?.goldOptions || [];
+            goldOptions = [];
         }
         if (goldOptions.length === 0) return null;
 
@@ -847,33 +812,17 @@ const ProductDetailScreen = () => {
     }
 
     function productSizeInfo() {
-        const cfg = product?.configurator;
         let sizes;
         let weightNote = null;
 
-        if (cfg?.enabled && getConfigurableMetals(cfg).length > 0) {
-            const variant = getCurrentVariant();
-            const variantSizes = variant?.sizes || [];
-            sizes = variantSizes.map(s => s.size);
-            if (selectedSize && variantSizes.length > 0) {
-                const sizeEntry = variantSizes.find(s => s.size === selectedSize);
-                if (sizeEntry) {
-                    const metalLabel = selectedMetalType ? (selectedMetalType.charAt(0).toUpperCase() + selectedMetalType.slice(1)) : 'Metal';
-                    weightNote = `${metalLabel} weight: ${sizeEntry.netWeight}g for size ${selectedSize}`;
-                }
-            }
-        } else {
-            const sw = product?.sizeWeights || [];
-            if (sw.length > 0) {
-                sizes = sw.map(s => s.size);
-                if (selectedSize) {
-                    const sizeEntry = sw.find(s => s.size === selectedSize);
-                    if (sizeEntry && sizeEntry.netWeight) {
-                        weightNote = `Weight: ${sizeEntry.netWeight}g for size ${selectedSize}`;
-                    }
-                }
-            } else {
-                sizes = product?.sizes || [];
+        const variant = getCurrentVariant();
+        const variantSizes = variant?.sizes || [];
+        sizes = variantSizes.map(s => s.size);
+        if (selectedSize && variantSizes.length > 0) {
+            const sizeEntry = variantSizes.find(s => s.size === selectedSize);
+            if (sizeEntry) {
+                const metalLabel = selectedMetalType ? (selectedMetalType.charAt(0).toUpperCase() + selectedMetalType.slice(1)) : 'Metal';
+                weightNote = `${metalLabel} weight: ${sizeEntry.netWeight}g for size ${selectedSize}`;
             }
         }
 

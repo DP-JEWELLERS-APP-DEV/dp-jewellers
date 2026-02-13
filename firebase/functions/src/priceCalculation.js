@@ -5,6 +5,27 @@ const admin = require("firebase-admin");
 const db = admin.firestore();
 
 /**
+ * Helper: get default pricing for a product using its configurator defaults.
+ */
+function getDefaultPricing(product, rates, taxSettings, makingChargesConfig) {
+  const normalized = normalizeConfigurator(product.configurator);
+  if (!normalized) return null;
+
+  const defaultMetal = normalized.configurableMetals.find((m) => m.type === normalized.defaultMetalType)
+    || normalized.configurableMetals[0];
+  const defaultVariant = defaultMetal?.variants?.find((v) => v.purity === normalized.defaultPurity)
+    || defaultMetal?.variants?.[0];
+
+  if (!defaultVariant) return null;
+
+  return calculateVariantPriceInternal(
+    product, rates, taxSettings, makingChargesConfig,
+    defaultVariant.purity, defaultVariant.defaultDiamondQuality || null,
+    defaultVariant.defaultSize || null, defaultMetal.type
+  );
+}
+
+/**
  * Firestore Trigger: When metalRates/current is updated,
  * recalculate prices for ALL active products.
  */
@@ -51,19 +72,17 @@ exports.onMetalRatesUpdate = onDocumentUpdated(
 
       for (const doc of chunk) {
         const product = doc.data();
-        const newPricing = calculatePrice(product, newRates, taxSettings, makingChargesConfig);
+        const newPricing = getDefaultPricing(product, newRates, taxSettings, makingChargesConfig);
 
-        const updateFields = {
+        if (!newPricing) continue; // Skip products without valid configurator
+
+        const priceRange = computePriceRange(product, newRates, taxSettings, makingChargesConfig);
+
+        batch.update(doc.ref, {
           pricing: newPricing,
+          priceRange,
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        };
-
-        // Recompute priceRange for configurator-enabled products
-        if (product.configurator?.enabled) {
-          updateFields.priceRange = computePriceRange(product, newRates, taxSettings, makingChargesConfig);
-        }
-
-        batch.update(doc.ref, updateFields);
+        });
       }
 
       await batch.commit();
@@ -75,13 +94,14 @@ exports.onMetalRatesUpdate = onDocumentUpdated(
 );
 
 /**
- * Callable: Calculate price for a single product (preview before saving)
+ * Callable: Calculate price for a product (preview before saving).
+ * Uses configurator data to compute default variant price.
  */
 exports.calculateProductPrice = onCall({ region: "asia-south1" }, async (request) => {
   const productData = request.data;
 
-  if (!productData || !productData.metal) {
-    throw new HttpsError("invalid-argument", "Product data with metal details is required.");
+  if (!productData || !productData.configurator) {
+    throw new HttpsError("invalid-argument", "Product data with configurator details is required.");
   }
 
   const ratesDoc = await db.collection("metalRates").doc("current").get();
@@ -96,7 +116,11 @@ exports.calculateProductPrice = onCall({ region: "asia-south1" }, async (request
   const taxSettings = taxDoc.exists ? taxDoc.data() : { gst: { jewelry: 3 } };
   const makingChargesConfig = makingChargesDoc.exists ? makingChargesDoc.data() : {};
 
-  const pricing = calculatePrice(productData, ratesDoc.data(), taxSettings, makingChargesConfig);
+  const pricing = getDefaultPricing(productData, ratesDoc.data(), taxSettings, makingChargesConfig);
+
+  if (!pricing) {
+    throw new HttpsError("invalid-argument", "Could not compute pricing. Check configurator data.");
+  }
 
   return pricing;
 });
@@ -106,9 +130,7 @@ exports.calculateProductPrice = onCall({ region: "asia-south1" }, async (request
  * Used by the mobile app when a customer changes purity, diamond quality, or size.
  */
 exports.calculateVariantPrice = onCall({ region: "asia-south1" }, async (request) => {
-  const { productId, selectedPurity, selectedPurities, selectedDiamondQuality, selectedSize, selectedMetalType } = request.data || {};
-  // Accept both new (string) and old (array) format for backward compat
-  const purity = selectedPurity || (selectedPurities && selectedPurities[0]) || null;
+  const { productId, selectedPurity, selectedDiamondQuality, selectedSize, selectedMetalType } = request.data || {};
 
   if (!productId) {
     throw new HttpsError("invalid-argument", "productId is required.");
@@ -120,12 +142,6 @@ exports.calculateVariantPrice = onCall({ region: "asia-south1" }, async (request
   }
 
   const product = productDoc.data();
-  const configurator = product.configurator;
-
-  if (!configurator || !configurator.enabled) {
-    // Fallback: return existing stored pricing for non-configurator products
-    return product.pricing || {};
-  }
 
   const [ratesDoc, taxDoc, makingChargesDoc] = await Promise.all([
     db.collection("metalRates").doc("current").get(),
@@ -143,7 +159,7 @@ exports.calculateVariantPrice = onCall({ region: "asia-south1" }, async (request
 
   const variantPricing = calculateVariantPriceInternal(
     product, rates, taxSettings, makingChargesConfig,
-    purity, selectedDiamondQuality, selectedSize, selectedMetalType
+    selectedPurity, selectedDiamondQuality, selectedSize, selectedMetalType
   );
 
   return variantPricing;
@@ -151,7 +167,7 @@ exports.calculateVariantPrice = onCall({ region: "asia-south1" }, async (request
 
 /**
  * Normalize configurator data to v3 (multi-metal) format.
- * Handles v1 (metalOptions), v2 (configurableMetal singular), and v3 (configurableMetals array).
+ * Handles v2 (configurableMetal singular) and v3 (configurableMetals array).
  */
 function normalizeConfigurator(configurator) {
   if (!configurator || !configurator.enabled) return null;
@@ -216,14 +232,6 @@ function calculateVariantPriceInternal(product, rates, taxSettings, makingCharge
     variant = variants.find((v) => v.purity === selectedPurity)
       || variants.find((v) => v.purity === configMetal.defaultPurity)
       || variants[0];
-  } else {
-    // Legacy fallback for malformed data
-    const legacyMetal = configurator.configurableMetal || {};
-    configMetal = legacyMetal;
-    const variants = legacyMetal.variants || [];
-    variant = variants.find((v) => v.purity === selectedPurity)
-      || variants.find((v) => v.purity === legacyMetal.defaultPurity)
-      || variants[0];
   }
 
   if (!variant) {
@@ -260,7 +268,10 @@ function calculateVariantPriceInternal(product, rates, taxSettings, makingCharge
   // Add fixed metals
   for (const fm of fixedMetals) {
     const fmRate = getMetalRate(fm.type, fm.purity, rates);
-    const fmNetWeight = fm.netWeight || 0;
+    const sizeRow = selectedSize && fm.sizes?.length > 0
+      ? fm.sizes.find((s) => s.size === selectedSize)
+      : null;
+    const fmNetWeight = Number(sizeRow?.netWeight ?? fm.netWeight) || 0;
     const fmValue = fmNetWeight * fmRate;
     totalMetalValue += fmValue;
     totalNetWeight += fmNetWeight;
@@ -287,12 +298,12 @@ function calculateVariantPriceInternal(product, rates, taxSettings, makingCharge
   // Gemstone value
   const gemstoneValue = pricing.gemstoneValue || 0;
 
-  // Per-metal pricing (v3) takes priority over product-level pricing
+  // Per-metal pricing takes priority over category/global defaults
   const metalPricing = configMetal?.pricing || {};
 
-  // Making charges: per-metal > product-level > category > global
+  // Making charges: per-metal > category > global
   let mcType, mcValue;
-  if (metalPricing.makingChargeValue != null && metalPricing.makingChargeValue !== "") {
+  if (metalPricing.makingChargeValue != null && metalPricing.makingChargeValue !== "" && metalPricing.makingChargeValue !== 0) {
     mcType = metalPricing.makingChargeType || "percentage";
     mcValue = metalPricing.makingChargeValue;
   } else {
@@ -307,9 +318,9 @@ function calculateVariantPriceInternal(product, rates, taxSettings, makingCharge
     makingChargeAmount = mcValue;
   }
 
-  // Wastage charges: per-metal > product-level > global
+  // Wastage charges: per-metal > global
   let wcType, wcValue;
-  if (metalPricing.wastageChargeValue != null && metalPricing.wastageChargeValue !== "") {
+  if (metalPricing.wastageChargeValue != null && metalPricing.wastageChargeValue !== "" && metalPricing.wastageChargeValue !== 0) {
     wcType = metalPricing.wastageChargeType || "percentage";
     wcValue = metalPricing.wastageChargeValue;
   } else {
@@ -374,27 +385,19 @@ function calculateVariantPriceInternal(product, rates, taxSettings, makingCharge
 }
 
 /**
- * Compute min/max/default price range for a configurator-enabled product.
- * Iterates all metal types × purity variants × diamond qualities × size weight extremes.
+ * Compute min/max/default price range for a product.
+ * Iterates all metal types x purity variants x diamond qualities x size weight extremes.
  */
 function computePriceRange(product, rates, taxSettings, makingChargesConfig) {
-  const configurator = product.configurator;
-  if (!configurator || !configurator.enabled) {
-    const fp = product.pricing?.finalPrice || 0;
-    return { minPrice: fp, maxPrice: fp, defaultPrice: fp };
-  }
-
-  const normalized = normalizeConfigurator(configurator);
+  const normalized = normalizeConfigurator(product.configurator);
   if (!normalized || normalized.configurableMetals.length === 0) {
-    const fp = product.pricing?.finalPrice || 0;
-    return { minPrice: fp, maxPrice: fp, defaultPrice: fp };
+    return { minPrice: 0, maxPrice: 0, defaultPrice: 0 };
   }
 
   const allMetals = normalized.configurableMetals;
   const totalVariants = allMetals.reduce((sum, m) => sum + (m.variants || []).length, 0);
   if (totalVariants === 0) {
-    const fp = product.pricing?.finalPrice || 0;
-    return { minPrice: fp, maxPrice: fp, defaultPrice: fp };
+    return { minPrice: 0, maxPrice: 0, defaultPrice: 0 };
   }
 
   let minPrice = Infinity;
@@ -458,28 +461,20 @@ function computePriceRange(product, rates, taxSettings, makingChargesConfig) {
   };
 }
 
-// Export internal helpers for use by other modules (cart enrichment)
+// Export internal helpers for use by other modules (cart, orders, products)
 exports._calculateVariantPriceInternal = calculateVariantPriceInternal;
 exports._computePriceRange = computePriceRange;
 exports._normalizeConfigurator = normalizeConfigurator;
+exports._getDefaultPricing = getDefaultPricing;
 
 /**
- * Resolve making/wastage charge for a product.
- * Priority: product-level override > category override > global default
+ * Resolve making charge fallback: category override > global default.
+ * Used when per-metal pricing is not set.
  */
 function resolveMakingCharge(product, makingChargesConfig) {
-  const pricing = product.pricing || {};
   const category = product.category || "";
 
-  // 1. If product has its own making charge set, use it
-  if (pricing.makingChargeValue != null && pricing.makingChargeValue !== "") {
-    return {
-      mcType: pricing.makingChargeType || "percentage",
-      mcValue: pricing.makingChargeValue,
-    };
-  }
-
-  // 2. Look for category-specific override in makingCharges collection
+  // 1. Look for category-specific override in makingCharges collection
   const charges = makingChargesConfig.charges || [];
   const categoryOverride = charges.find(
     (c) => c.jewelryType && c.jewelryType.toLowerCase() === category.toLowerCase()
@@ -492,7 +487,7 @@ function resolveMakingCharge(product, makingChargesConfig) {
     };
   }
 
-  // 3. Fall back to global default
+  // 2. Fall back to global default
   const globalDefault = makingChargesConfig.globalDefault || {};
   return {
     mcType: globalDefault.chargeType || "percentage",
@@ -501,145 +496,10 @@ function resolveMakingCharge(product, makingChargesConfig) {
 }
 
 function resolveWastageCharge(product, makingChargesConfig) {
-  const pricing = product.pricing || {};
-
-  // 1. If product has its own wastage charge set, use it
-  if (pricing.wastageChargeValue != null && pricing.wastageChargeValue !== "") {
-    return {
-      wcType: pricing.wastageChargeType || "percentage",
-      wcValue: pricing.wastageChargeValue,
-    };
-  }
-
-  // 2. Fall back to global wastage default
+  // Fall back to global wastage default
   const globalWastage = makingChargesConfig.globalWastage || {};
   return {
     wcType: globalWastage.chargeType || "percentage",
     wcValue: globalWastage.value || 0,
-  };
-}
-
-/**
- * Core price calculation logic
- */
-function calculatePrice(product, rates, taxSettings, makingChargesConfig = {}) {
-  const metal = product.metal || {};
-  const diamond = product.diamond || {};
-  const pricing = product.pricing || {};
-
-  // Metal value
-  let metalValue = 0;
-  let ratePerGram = 0;
-
-  if (metal.type === "gold" && metal.purity && rates.gold) {
-    ratePerGram = rates.gold[metal.purity] || 0;
-    metalValue = (metal.netWeight || 0) * ratePerGram;
-  } else if (metal.type === "silver" && metal.silverType && rates.silver) {
-    ratePerGram = rates.silver[metal.silverType] || 0;
-    metalValue = (metal.netWeight || 0) * ratePerGram;
-  } else if (metal.type === "platinum" && rates.platinum) {
-    ratePerGram = rates.platinum.perGram || 0;
-    metalValue = (metal.netWeight || 0) * ratePerGram;
-  }
-
-  // Diamond value
-  let diamondValue = 0;
-  let diamondRatePerCarat = 0;
-
-  if (diamond.hasDiamond && diamond.totalCaratWeight && rates.diamond) {
-    const clarityMap = {
-      FL: "IF", IF: "IF",
-      VVS1: "VVS", VVS2: "VVS",
-      VS1: "VS", VS2: "VS",
-      SI1: "SI", SI2: "SI",
-      I1: "SI", I2: "SI", I3: "SI",
-    };
-    const colorMap = {
-      D: "DEF", E: "DEF", F: "DEF",
-      G: "GH", H: "GH",
-      I: "IJ", J: "IJ",
-      K: "IJ", L: "IJ", M: "IJ",
-    };
-
-    const clarityKey = clarityMap[diamond.clarity] || "SI";
-    const colorKey = colorMap[diamond.color] || "IJ";
-    const rateKey = `${clarityKey}_${colorKey}`;
-
-    diamondRatePerCarat = rates.diamond[rateKey] || rates.diamond["SI_IJ"] || 25000;
-    diamondValue = diamond.totalCaratWeight * diamondRatePerCarat;
-  }
-
-  // Gemstone value (manually set)
-  const gemstoneValue = pricing.gemstoneValue || 0;
-
-  // Making charges: category override → global default
-  const { mcType, mcValue } = resolveMakingCharge(product, makingChargesConfig);
-  let makingChargeAmount = 0;
-
-  if (mcType === "percentage") {
-    makingChargeAmount = metalValue * (mcValue / 100);
-  } else if (mcType === "flat_per_gram") {
-    makingChargeAmount = (metal.netWeight || 0) * mcValue;
-  } else if (mcType === "fixed_amount") {
-    makingChargeAmount = mcValue;
-  }
-
-  // Wastage charges: product override → global default
-  const { wcType, wcValue } = resolveWastageCharge(product, makingChargesConfig);
-  let wastageChargeAmount = 0;
-
-  if (wcType === "percentage") {
-    wastageChargeAmount = metalValue * (wcValue / 100);
-  } else {
-    wastageChargeAmount = wcValue;
-  }
-
-  const stoneSettingCharges = pricing.stoneSettingCharges || 0;
-  const designCharges = pricing.designCharges || 0;
-
-  const subtotal = metalValue + diamondValue + gemstoneValue +
-    makingChargeAmount + wastageChargeAmount + stoneSettingCharges + designCharges;
-
-  const discount = pricing.discount || 0;
-
-  // Use product-level tax if set, otherwise fall back to global tax settings
-  const productTax = product.tax || {};
-  const jewelryTaxRate = productTax.jewelryGst || taxSettings.gst?.jewelry || 3;
-  const makingTaxRate = productTax.makingGst || taxSettings.gst?.makingCharges || 5;
-
-  const jewelryTaxableAmount = metalValue + diamondValue + gemstoneValue;
-  const labourTaxableAmount = makingChargeAmount + wastageChargeAmount + stoneSettingCharges + designCharges;
-
-  const jewelryTaxAmount = jewelryTaxableAmount * (jewelryTaxRate / 100);
-  const labourTaxAmount = labourTaxableAmount * (makingTaxRate / 100);
-  const totalTaxAmount = jewelryTaxAmount + labourTaxAmount;
-
-  const finalPrice = Math.round(subtotal - discount + totalTaxAmount);
-
-  return {
-    goldRatePerGram: metal.type === "gold" ? ratePerGram : 0,
-    silverRatePerGram: metal.type === "silver" ? ratePerGram : 0,
-    diamondRatePerCarat,
-    makingChargeType: mcType,
-    makingChargeValue: mcValue,
-    makingChargeAmount: Math.round(makingChargeAmount),
-    wastageChargeType: wcType,
-    wastageChargeValue: wcValue,
-    wastageChargeAmount: Math.round(wastageChargeAmount),
-    stoneSettingCharges,
-    designCharges,
-    metalValue: Math.round(metalValue),
-    diamondValue: Math.round(diamondValue),
-    gemstoneValue,
-    subtotal: Math.round(subtotal),
-    discount,
-    jewelryTaxRate,
-    makingTaxRate,
-    jewelryTaxAmount: Math.round(jewelryTaxAmount),
-    labourTaxAmount: Math.round(labourTaxAmount),
-    taxAmount: Math.round(totalTaxAmount),
-    finalPrice,
-    mrp: pricing.mrp || finalPrice,
-    sellingPrice: finalPrice,
   };
 }

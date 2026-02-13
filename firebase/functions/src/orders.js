@@ -1,6 +1,7 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
 const { logActivity } = require("./activityLog");
+const { _calculateVariantPriceInternal, _normalizeConfigurator } = require("./priceCalculation");
 
 const db = admin.firestore();
 
@@ -68,7 +69,34 @@ exports.createOrder = onCall({ region: "asia-south1" }, async (request) => {
     throw new HttpsError("invalid-argument", "Store selection required for pickup.");
   }
 
-  // Validate and build order items with current prices
+  // Fetch metal rates, tax settings, and making charges EARLY for variant pricing
+  let metalRatesSnapshot = null;
+  let rates = {};
+  let taxSettings = { gst: { jewelry: 3 } };
+  let makingChargesConfig = {};
+
+  try {
+    const [ratesDoc, taxDoc, makingChargesDoc] = await Promise.all([
+      db.collection("metalRates").doc("current").get(),
+      db.collection("taxSettings").doc("current").get(),
+      db.collection("makingCharges").doc("current").get(),
+    ]);
+
+    if (ratesDoc.exists) {
+      metalRatesSnapshot = ratesDoc.data();
+      rates = ratesDoc.data();
+    }
+    if (taxDoc.exists) {
+      taxSettings = taxDoc.data();
+    }
+    if (makingChargesDoc.exists) {
+      makingChargesConfig = makingChargesDoc.data();
+    }
+  } catch (err) {
+    console.log("Warning: Could not fetch rates/config for pricing:", err.message);
+  }
+
+  // Validate and build order items with current variant prices
   const orderItems = [];
   let subtotal = 0;
 
@@ -85,7 +113,18 @@ exports.createOrder = onCall({ region: "asia-south1" }, async (request) => {
       throw new HttpsError("failed-precondition", `${product.name} is out of stock.`);
     }
 
-    const itemTotal = product.pricing.finalPrice * (item.quantity || 1);
+    // Recalculate price using variant pricing
+    const purity = item.selectedPurity || product.configurator?.defaultPurity;
+    const metalType = item.selectedMetalType || product.configurator?.defaultMetalType;
+    const itemPricing = _calculateVariantPriceInternal(
+      product, rates, taxSettings, makingChargesConfig,
+      purity,
+      item.selectedDiamondQuality || null,
+      item.selectedSize || item.size || null,
+      metalType
+    );
+
+    const itemTotal = itemPricing.finalPrice * (item.quantity || 1);
     subtotal += itemTotal;
 
     orderItems.push({
@@ -93,19 +132,21 @@ exports.createOrder = onCall({ region: "asia-south1" }, async (request) => {
       productName: product.name,
       productCode: product.productCode,
       selectedSize: item.selectedSize || null,
+      selectedMetalType: metalType,
+      selectedPurity: purity,
+      selectedColor: item.selectedColor || null,
+      selectedDiamondQuality: item.selectedDiamondQuality || null,
       quantity: item.quantity || 1,
       priceSnapshot: {
-        metalRateUsed: product.pricing.goldRatePerGram || product.pricing.silverRatePerGram || 0,
-        netWeight: product.metal?.netWeight || 0,
-        metalValue: product.pricing.metalValue,
-        diamondValue: product.pricing.diamondValue,
-        makingCharges: product.pricing.makingChargeAmount,
-        wastageCharges: product.pricing.wastageChargeAmount,
-        otherCharges: (product.pricing.stoneSettingCharges || 0) + (product.pricing.designCharges || 0),
-        subtotal: product.pricing.subtotal,
-        discount: product.pricing.discount,
-        tax: product.pricing.taxAmount,
-        itemTotal: product.pricing.finalPrice,
+        metalValue: itemPricing.metalValue,
+        diamondValue: itemPricing.diamondValue,
+        makingCharges: itemPricing.makingChargeAmount,
+        wastageCharges: itemPricing.wastageChargeAmount,
+        otherCharges: (itemPricing.stoneSettingCharges || 0) + (itemPricing.designCharges || 0),
+        subtotal: itemPricing.subtotal,
+        discount: itemPricing.discount,
+        tax: itemPricing.taxAmount,
+        itemTotal: itemPricing.finalPrice,
       },
       image: product.images?.[0]?.url || "",
     });
@@ -158,17 +199,6 @@ exports.createOrder = onCall({ region: "asia-south1" }, async (request) => {
     if (partialPayment.amountPaid > totalAmount) {
       throw new HttpsError("invalid-argument", "Payment amount cannot exceed order total.");
     }
-  }
-
-  // Fetch current metal rates for price locking
-  let metalRatesSnapshot = null;
-  try {
-    const ratesDoc = await db.collection("metalRates").doc("current").get();
-    if (ratesDoc.exists) {
-      metalRatesSnapshot = ratesDoc.data();
-    }
-  } catch (err) {
-    console.log("Warning: Could not fetch metal rates for snapshot:", err.message);
   }
 
   const orderId = await generateOrderId();

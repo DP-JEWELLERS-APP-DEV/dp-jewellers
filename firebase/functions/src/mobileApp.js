@@ -1,6 +1,6 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
-const { _calculateVariantPriceInternal } = require("./priceCalculation");
+const { _calculateVariantPriceInternal, _normalizeConfigurator } = require("./priceCalculation");
 
 const db = admin.firestore();
 const USERS = "users";
@@ -18,9 +18,9 @@ function mapProductDoc(doc) {
     name: data.name,
     category: data.category,
     image: data.images?.[0]?.url || "",
-    finalPrice: data.priceRange?.defaultPrice || data.pricing?.finalPrice || 0,
+    finalPrice: data.priceRange?.defaultPrice || 0,
     priceRange: data.priceRange || null,
-    metalType: data.metal?.type || "",
+    metalType: data.configurator?.defaultMetalType || "",
     purchaseCount: data.purchaseCount || 0,
     isActive: data.isActive !== false,
   };
@@ -199,22 +199,15 @@ exports.getCart = onCall({ region: "asia-south1" }, async (request) => {
     return { cart: [], count: 0 };
   }
 
-  // Check if any items have variant selections - if so, we need rates for recalculation
-  const hasVariantItems = cart.some((item) => item.selectedPurity || item.selectedDiamondQuality);
-  let rates = null;
-  let taxSettings = null;
-  let makingChargesConfig = null;
-
-  if (hasVariantItems) {
-    const [ratesDoc, taxDoc, makingChargesDoc] = await Promise.all([
-      db.collection("metalRates").doc("current").get(),
-      db.collection("taxSettings").doc("current").get(),
-      db.collection("makingCharges").doc("current").get(),
-    ]);
-    rates = ratesDoc.exists ? ratesDoc.data() : {};
-    taxSettings = taxDoc.exists ? taxDoc.data() : { gst: { jewelry: 3 } };
-    makingChargesConfig = makingChargesDoc.exists ? makingChargesDoc.data() : {};
-  }
+  // Always fetch rates, tax settings, and making charges for variant price calculation
+  const [ratesDoc, taxDoc, makingChargesDoc] = await Promise.all([
+    db.collection("metalRates").doc("current").get(),
+    db.collection("taxSettings").doc("current").get(),
+    db.collection("makingCharges").doc("current").get(),
+  ]);
+  const rates = ratesDoc.exists ? ratesDoc.data() : {};
+  const taxSettings = taxDoc.exists ? taxDoc.data() : { gst: { jewelry: 3 } };
+  const makingChargesConfig = makingChargesDoc.exists ? makingChargesDoc.data() : {};
 
   // Fetch product details for each cart item
   const enrichedCart = [];
@@ -222,16 +215,15 @@ exports.getCart = onCall({ region: "asia-south1" }, async (request) => {
     const productDoc = await db.collection(PRODUCTS).doc(item.productId).get();
     if (productDoc.exists) {
       const product = productDoc.data();
-      let finalPrice = product.pricing?.finalPrice || 0;
 
-      // Recalculate price for variant selections on configurator-enabled products
-      if (item.selectedPurity && product.configurator?.enabled && rates) {
-        const variantPricing = _calculateVariantPriceInternal(
-          product, rates, taxSettings, makingChargesConfig,
-          item.selectedPurity, item.selectedDiamondQuality, item.size, item.selectedMetalType
-        );
-        finalPrice = variantPricing.finalPrice;
-      }
+      // Always recalculate price through variant pricing using selections or configurator defaults
+      const purity = item.selectedPurity || product.configurator?.defaultPurity;
+      const metalType = item.selectedMetalType || product.configurator?.defaultMetalType;
+      const variantPricing = _calculateVariantPriceInternal(
+        product, rates, taxSettings, makingChargesConfig,
+        purity, item.selectedDiamondQuality || null, item.size || null, metalType
+      );
+      const finalPrice = variantPricing.finalPrice;
 
       enrichedCart.push({
         productId: item.productId,
@@ -385,7 +377,7 @@ exports.getFavorites = onCall({ region: "asia-south1" }, async (request) => {
         productId,
         name: product.name,
         image: product.images?.[0]?.url || "",
-        finalPrice: product.pricing?.finalPrice || 0,
+        finalPrice: product.priceRange?.defaultPrice || 0,
         category: product.category,
       });
     }
@@ -612,17 +604,13 @@ exports.searchProducts = onCall({ region: "asia-south1" }, async (request) => {
     firestoreQuery = firestoreQuery.where("category", "==", category);
   }
 
-  if (material) {
-    firestoreQuery = firestoreQuery.where("metal.type", "==", material);
-  }
-
   // Apply sorting
   switch (sortBy) {
     case "price_asc":
-      firestoreQuery = firestoreQuery.orderBy("pricing.finalPrice", "asc");
+      firestoreQuery = firestoreQuery.orderBy("priceRange.defaultPrice", "asc");
       break;
     case "price_desc":
-      firestoreQuery = firestoreQuery.orderBy("pricing.finalPrice", "desc");
+      firestoreQuery = firestoreQuery.orderBy("priceRange.defaultPrice", "desc");
       break;
     case "popular":
       firestoreQuery = firestoreQuery.orderBy("purchaseCount", "desc");
@@ -651,9 +639,9 @@ exports.searchProducts = onCall({ region: "asia-south1" }, async (request) => {
       name: data.name,
       category: data.category,
       image: data.images?.[0]?.url || "",
-      finalPrice: data.priceRange?.defaultPrice || data.pricing?.finalPrice || 0,
+      finalPrice: data.priceRange?.defaultPrice || 0,
       priceRange: data.priceRange || null,
-      metalType: data.metal?.type || "",
+      metalType: data.configurator?.defaultMetalType || "",
     };
   });
 
@@ -714,9 +702,9 @@ exports.getProductsByCategory = onCall({ region: "asia-south1" }, async (request
       name: data.name,
       category: data.category,
       image: data.images?.[0]?.url || "",
-      finalPrice: data.priceRange?.defaultPrice || data.pricing?.finalPrice || 0,
+      finalPrice: data.priceRange?.defaultPrice || 0,
       priceRange: data.priceRange || null,
-      metalType: data.metal?.type || "",
+      metalType: data.configurator?.defaultMetalType || "",
     };
   });
 
