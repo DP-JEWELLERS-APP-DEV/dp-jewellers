@@ -39,6 +39,7 @@ exports.calculateVariantPrice = priceCalculation.calculateVariantPrice;
 // ORDER FUNCTIONS
 // ============================================
 exports.createOrder = orders.createOrder;
+exports.verifyPayment = orders.verifyPayment;
 exports.listOrders = orders.listOrders;
 exports.updateOrderStatus = orders.updateOrderStatus;
 exports.getUserOrders = orders.getUserOrders;

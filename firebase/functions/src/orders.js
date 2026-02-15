@@ -1,7 +1,16 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
+const crypto = require("crypto");
+const Razorpay = require("razorpay");
 const { logActivity } = require("./activityLog");
 const { _calculateVariantPriceInternal, _normalizeConfigurator } = require("./priceCalculation");
+
+function getRazorpayInstance() {
+  return new Razorpay({
+    key_id: process.env.RAZORPAY_KEY_ID,
+    key_secret: process.env.RAZORPAY_KEY_SECRET,
+  });
+}
 
 const db = admin.firestore();
 
@@ -46,7 +55,7 @@ async function generateOrderId() {
 /**
  * Create a new order
  */
-exports.createOrder = onCall({ region: "asia-south1" }, async (request) => {
+exports.createOrder = onCall({ region: "asia-south1", secrets: ["RAZORPAY_KEY_ID", "RAZORPAY_KEY_SECRET"] }, async (request) => {
   if (!request.auth) {
     throw new HttpsError("unauthenticated", "You must be logged in to place an order.");
   }
@@ -124,7 +133,11 @@ exports.createOrder = onCall({ region: "asia-south1" }, async (request) => {
       metalType
     );
 
-    const itemTotal = itemPricing.finalPrice * (item.quantity || 1);
+    const unitPrice = itemPricing?.finalPrice || itemPricing?.price || 0;
+    if (!unitPrice || unitPrice <= 0) {
+      throw new HttpsError("failed-precondition", `Could not calculate price for ${product.name}. Please contact support.`);
+    }
+    const itemTotal = unitPrice * (item.quantity || 1);
     subtotal += itemTotal;
 
     orderItems.push({
@@ -138,15 +151,15 @@ exports.createOrder = onCall({ region: "asia-south1" }, async (request) => {
       selectedDiamondQuality: item.selectedDiamondQuality || null,
       quantity: item.quantity || 1,
       priceSnapshot: {
-        metalValue: itemPricing.metalValue,
-        diamondValue: itemPricing.diamondValue,
-        makingCharges: itemPricing.makingChargeAmount,
-        wastageCharges: itemPricing.wastageChargeAmount,
+        metalValue: itemPricing.metalValue || 0,
+        diamondValue: itemPricing.diamondValue || 0,
+        makingCharges: itemPricing.makingChargeAmount || 0,
+        wastageCharges: itemPricing.wastageChargeAmount || 0,
         otherCharges: (itemPricing.stoneSettingCharges || 0) + (itemPricing.designCharges || 0),
-        subtotal: itemPricing.subtotal,
-        discount: itemPricing.discount,
-        tax: itemPricing.taxAmount,
-        itemTotal: itemPricing.finalPrice,
+        subtotal: itemPricing.subtotal || unitPrice,
+        discount: itemPricing.discount || 0,
+        tax: itemPricing.taxAmount || 0,
+        itemTotal: unitPrice,
       },
       image: product.images?.[0]?.url || "",
     });
@@ -246,8 +259,102 @@ exports.createOrder = onCall({ region: "asia-south1" }, async (request) => {
 
   const docRef = await db.collection("orders").add(order);
 
-  // Update product inventory
-  for (const item of items) {
+  // Create Razorpay order
+  let razorpayOrderId = null;
+  try {
+    const razorpay = getRazorpayInstance();
+    const amountForPayment = partialPayment && deliveryType === "store_pickup"
+      ? partialPayment.amountPaid
+      : totalAmount;
+
+    const razorpayOrder = await razorpay.orders.create({
+      amount: amountForPayment * 100, // paise
+      currency: "INR",
+      receipt: orderId,
+      notes: { orderDocId: docRef.id, userId: request.auth.uid },
+    });
+
+    razorpayOrderId = razorpayOrder.id;
+
+    // Save razorpayOrderId back to the Firestore order
+    await docRef.update({ razorpayOrderId });
+  } catch (err) {
+    // Clean up the pending order if Razorpay fails
+    await docRef.delete();
+    console.error("Razorpay order creation failed:", err);
+    throw new HttpsError("internal", "Failed to initiate payment. Please try again.");
+  }
+
+  return {
+    orderDocId: docRef.id,
+    orderId,
+    totalAmount,
+    razorpayOrderId,
+    razorpayKeyId: process.env.RAZORPAY_KEY_ID,
+    message: "Order initiated. Complete payment to confirm.",
+  };
+});
+
+/**
+ * Verify Razorpay payment signature and confirm the order
+ */
+exports.verifyPayment = onCall({ region: "asia-south1", secrets: ["RAZORPAY_KEY_SECRET"] }, async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "You must be logged in.");
+  }
+
+  const { orderDocId, razorpayPaymentId, razorpayOrderId, razorpaySignature } = request.data;
+
+  if (!orderDocId || !razorpayPaymentId || !razorpayOrderId || !razorpaySignature) {
+    throw new HttpsError("invalid-argument", "Missing payment verification parameters.");
+  }
+
+  // Verify HMAC signature
+  const expectedSignature = crypto
+    .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
+    .update(`${razorpayOrderId}|${razorpayPaymentId}`)
+    .digest("hex");
+
+  if (expectedSignature !== razorpaySignature) {
+    throw new HttpsError("invalid-argument", "Payment verification failed. Invalid signature.");
+  }
+
+  // Fetch and validate the order
+  const orderRef = db.collection("orders").doc(orderDocId);
+  const orderDoc = await orderRef.get();
+
+  if (!orderDoc.exists) {
+    throw new HttpsError("not-found", "Order not found.");
+  }
+
+  const orderData = orderDoc.data();
+
+  if (orderData.userId !== request.auth.uid) {
+    throw new HttpsError("permission-denied", "You can only verify your own orders.");
+  }
+
+  if (orderData.paymentStatus === "paid") {
+    // Already verified (idempotent)
+    return { success: true, orderId: orderData.orderId, orderDocId };
+  }
+
+  // Update order as paid
+  await orderRef.update({
+    paymentStatus: "paid",
+    paymentId: razorpayPaymentId,
+    paymentGateway: "razorpay",
+    orderStatus: "confirmed",
+    confirmedAt: admin.firestore.FieldValue.serverTimestamp(),
+    trackingUpdates: admin.firestore.FieldValue.arrayUnion({
+      status: "confirmed",
+      timestamp: new Date().toISOString(),
+      note: "Payment received. Order confirmed.",
+    }),
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+
+  // Deduct inventory
+  for (const item of orderData.items) {
     await db.collection("products").doc(item.productId).update({
       "inventory.quantity": admin.firestore.FieldValue.increment(-(item.quantity || 1)),
       purchaseCount: admin.firestore.FieldValue.increment(item.quantity || 1),
@@ -255,16 +362,9 @@ exports.createOrder = onCall({ region: "asia-south1" }, async (request) => {
   }
 
   // Clear user's cart
-  await db.collection("users").doc(request.auth.uid).update({
-    cart: [],
-  });
+  await db.collection("users").doc(request.auth.uid).update({ cart: [] });
 
-  return {
-    orderDocId: docRef.id,
-    orderId,
-    totalAmount,
-    message: "Order placed successfully.",
-  };
+  return { success: true, orderId: orderData.orderId, orderDocId };
 });
 
 /**

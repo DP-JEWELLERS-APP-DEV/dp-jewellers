@@ -92,45 +92,7 @@ const OrderSummaryScreen = () => {
         setProcessingPayment(true);
 
         try {
-            // For now, we'll simulate Razorpay. In production, you would:
-            // 1. Create order on your backend (Firebase function)
-            // 2. Get order_id from Razorpay
-            // 3. Open Razorpay checkout
-
-            // Simulating payment success for demo
-            // In production, use RazorpayCheckout.open() with proper options
-
-            const options = {
-                description: 'DP Jewellers Order Payment',
-                image: 'https://your-logo-url.com/logo.png',
-                currency: 'INR',
-                key: RAZORPAY_KEY,
-                amount: payableAmount * 100, // Razorpay expects amount in paise
-                name: 'DP Jewellers',
-                prefill: {
-                    email: '',
-                    contact: '',
-                    name: ''
-                },
-                theme: { color: Colors.primaryColor }
-            };
-
-            // Uncomment this for actual Razorpay integration
-            // const data = await RazorpayCheckout.open(options);
-
-            // For now, directly create order
-            await createOrder();
-
-        } catch (error) {
-            console.log('Payment error:', error);
-            Alert.alert('Payment Failed', 'Something went wrong with the payment. Please try again.');
-        } finally {
-            setProcessingPayment(false);
-        }
-    };
-
-    const createOrder = async () => {
-        try {
+            // Step 1: Create order on backend — get Razorpay order ID
             const orderData = {
                 items: cartItems.map(item => ({
                     productId: item.productId,
@@ -154,9 +116,37 @@ const OrderSummaryScreen = () => {
             };
 
             const createOrderFn = httpsCallable(functions, 'createOrder');
-            const result = await createOrderFn(orderData);
+            const orderResult = await createOrderFn(orderData);
+            const { orderDocId, orderId, razorpayOrderId } = orderResult.data;
 
-            if (result.data?.orderId) {
+            // Step 2: Open Razorpay checkout
+            const options = {
+                description: 'DP Jewellers Order Payment',
+                currency: 'INR',
+                key: RAZORPAY_KEY,
+                amount: payableAmount * 100,
+                order_id: razorpayOrderId,
+                name: 'DP Jewellers',
+                prefill: {
+                    contact: selectedAddress?.phone || selectedAddress?.contactNumber || '',
+                    name: selectedAddress?.name || '',
+                    email: '',
+                },
+                theme: { color: Colors.primaryColor },
+            };
+
+            const paymentData = await RazorpayCheckout.open(options);
+
+            // Step 3: Verify payment signature on backend
+            const verifyPaymentFn = httpsCallable(functions, 'verifyPayment');
+            const verifyResult = await verifyPaymentFn({
+                orderDocId,
+                razorpayPaymentId: paymentData.razorpay_payment_id,
+                razorpayOrderId: paymentData.razorpay_order_id,
+                razorpaySignature: paymentData.razorpay_signature,
+            });
+
+            if (verifyResult.data?.success) {
                 navigation.reset({
                     index: 0,
                     routes: [
@@ -164,9 +154,9 @@ const OrderSummaryScreen = () => {
                         {
                             name: 'checkout/orderConfirmationScreen',
                             params: {
-                                orderId: result.data.orderId,
-                                orderDocId: result.data.orderDocId,
-                                totalAmount: result.data.totalAmount,
+                                orderId,
+                                orderDocId,
+                                totalAmount: orderResult.data.totalAmount,
                                 deliveryMethod,
                                 paidAmount: payableAmount,
                                 remainingAmount,
@@ -176,8 +166,15 @@ const OrderSummaryScreen = () => {
                 });
             }
         } catch (error) {
-            console.log('Order creation error:', error);
-            Alert.alert('Order Failed', error.message || 'Failed to create order. Please try again.');
+            if (error.code === 2) {
+                // User cancelled Razorpay
+                Alert.alert('Payment Cancelled', 'Payment was cancelled. Your order has not been placed.');
+            } else {
+                console.log('Payment error:', error);
+                Alert.alert('Payment Failed', error.message || 'Something went wrong with the payment. Please try again.');
+            }
+        } finally {
+            setProcessingPayment(false);
         }
     };
 
