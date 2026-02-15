@@ -58,9 +58,7 @@ const MetalRatesScreen = () => {
                                     <MaterialCommunityIcons name="currency-inr" size={20} color={Colors.blackColor} />
                                     <Text style={{ ...Fonts.blackColor16SemiBold, marginLeft: 8 }}>Current Metal & Diamond Rates</Text>
                                 </View>
-                                <View style={styles.readOnlyChip}>
-                                    <Text style={styles.readOnlyText}>Read Only</Text>
-                                </View>
+                             
                             </View>
 
                             <Section title="Gold (per gram)">

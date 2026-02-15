@@ -7,6 +7,7 @@ import { httpsCallable } from 'firebase/functions';
 import { auth, functions } from '../../../lib/firebase';
 import { Snackbar } from 'react-native-paper';
 import ProductCard from '../../../components/ProductCard';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const placeholderImage = require('../../../assets/images/jewellery/jewellary1.png');
 const categoryImageMap = {
@@ -23,6 +24,8 @@ const categoryImageMap = {
     Nosering: require('../../../assets/images/nosering.jpg'),
 };
 
+const HOME_CACHE_KEY = 'home_cache_v1';
+
 const HomeScreen = () => {
 
     const navigation = useNavigation();
@@ -37,6 +40,7 @@ const HomeScreen = () => {
     const [showSnackBar, setShowSnackBar] = useState(false);
     const [snackText, setSnackText] = useState('');
     const [favoriteIds, setFavoriteIds] = useState([]);
+    const [hasCachedData, setHasCachedData] = useState(false);
 
     const flatListRef = useRef(null);
     const [currentIndex, setCurrentIndex] = useState(0);
@@ -63,6 +67,45 @@ const HomeScreen = () => {
         return () => clearInterval(interval);
     }, [bannerData.length]);
 
+    const applyHomeData = (data) => {
+        const nextCategories = data?.categories || [];
+        const apiFeatured = data?.featured || [];
+        setcategories(nextCategories);
+        setfeatured(apiFeatured);
+        setrecommended(data?.recommended || apiFeatured);
+        setpopular(data?.popular || []);
+        setBannerData(data?.banners || []);
+    };
+
+    const loadCachedHomeData = async () => {
+        try {
+            const cached = await AsyncStorage.getItem(HOME_CACHE_KEY);
+            if (!cached) return false;
+            const parsed = JSON.parse(cached);
+            if (!parsed || typeof parsed !== 'object') return false;
+            applyHomeData(parsed);
+            setHasCachedData(true);
+            return true;
+        } catch (err) {
+            return false;
+        }
+    };
+
+    const persistHomeData = async (data) => {
+        try {
+            await AsyncStorage.setItem(HOME_CACHE_KEY, JSON.stringify({
+                categories: data?.categories || [],
+                featured: data?.featured || [],
+                recommended: data?.recommended || [],
+                popular: data?.popular || [],
+                banners: data?.banners || [],
+                cachedAt: Date.now(),
+            }));
+        } catch (err) {
+            // Ignore cache write errors
+        }
+    };
+
     useEffect(() => {
         let active = true;
         const fetchHomeData = async () => {
@@ -72,21 +115,31 @@ const HomeScreen = () => {
                 const getHomePageData = httpsCallable(functions, 'getHomePageData');
                 const res = await getHomePageData();
                 if (!active) return;
-                setcategories(res?.data?.categories || []);
-                const apiFeatured = res?.data?.featured || [];
-                setfeatured(apiFeatured);
-                setrecommended(res?.data?.recommended || apiFeatured);
-                setpopular(res?.data?.popular || []);
-                setBannerData(res?.data?.banners || []);
+                applyHomeData(res?.data || {});
+                setHasCachedData(true);
+                await persistHomeData(res?.data || {});
             } catch (err) {
                 if (active) {
-                    seterrorText('Failed to load home data.');
+                    const loaded = await loadCachedHomeData();
+                    if (loaded) {
+                        handleShowSnackBar('Showing saved data (offline).');
+                        seterrorText('');
+                    } else {
+                        seterrorText('Failed to load home data.');
+                    }
                 }
             } finally {
                 if (active) setloading(false);
             }
         };
-        fetchHomeData();
+
+        (async () => {
+            await loadCachedHomeData();
+            if (active) {
+                fetchHomeData();
+            }
+        })();
+
         return () => { active = false; };
     }, []);
 
@@ -159,7 +212,7 @@ const HomeScreen = () => {
         <View style={{ flex: 1, backgroundColor: Colors.whiteColor }}>
             <View style={{ flex: 1 }}>
                 {header()}
-                {loading ? (
+                {loading && !hasCachedData ? (
                     <View style={styles.centerWrap}>
                         <ActivityIndicator color={Colors.primaryColor} />
                     </View>
