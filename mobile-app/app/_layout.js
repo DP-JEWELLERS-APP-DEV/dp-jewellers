@@ -58,6 +58,7 @@ export default function RootLayout() {
         <Stack.Screen name="notifications/notificationsScreen" />
         <Stack.Screen name="contactUs/contactUsScreen" />
         <Stack.Screen name="termsAndCondition/termsAndConditionScreen" />
+        <Stack.Screen name="privacyPolicy/privacyPolicyScreen" />
       </Stack>
     </SafeAreaProvider>
   );

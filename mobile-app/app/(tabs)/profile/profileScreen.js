@@ -136,6 +136,7 @@ const ProfileScreen = () => {
                 {/* {profileOptionSort({ icon: require('../../../assets/images/icons/notification.png'), option: 'Notifications', onPress: () => { navigation.push('notifications/notificationsScreen') } })} */}
                 {profileOptionSort({ icon: require('../../../assets/images/icons/headset.png'), option: 'Contact us', onPress: () => { navigation.push('contactUs/contactUsScreen') } })}
                 {profileOptionSort({ icon: require('../../../assets/images/icons/assignment.png'), option: 'Terms & Conditions', onPress: () => { navigation.push('termsAndCondition/termsAndConditionScreen') } })}
+                {profileOptionSort({ icon: require('../../../assets/images/icons/assignment.png'), option: 'Privacy Policy', onPress: () => { navigation.push('privacyPolicy/privacyPolicyScreen') } })}
                 {profileOptionSort({ icon: require('../../../assets/images/icons/logout.png'), option: 'Logout', onPress: () => { setshowLogoutDialog(true) } })}
             </View>
         )

@@ -7,62 +7,63 @@ import { useNavigation } from 'expo-router'
 
 const sections = [
     {
-        title: 'Terms of Use',
+        title: 'Overview',
         items: [
-            'By using the DP Jewellers mobile app, you agree to these Terms and to follow all applicable laws and regulations.',
-            'If you do not agree with any part of these Terms, please do not use the app or place orders.'
+            'Your privacy matters to us. This Privacy Policy explains how DP Jewellers collects, uses, and protects your information when you use the app.'
         ]
     },
     {
-        title: 'Eligibility',
+        title: 'Information We Collect',
         items: [
-            'You must be at least 18 years old, or have permission from a parent or guardian, to make purchases through the app.'
+            'Account information such as your name, phone number, and profile details.',
+            'Order and transaction information, including items purchased and delivery address.',
+            'Device and usage data such as app activity, device type, and diagnostics to improve performance.'
         ]
     },
     {
-        title: 'Products, Pricing, and Availability',
+        title: 'How We Use Your Information',
         items: [
-            'Product images are for reference. Actual size, color, and appearance may vary slightly based on display and craftsmanship.',
-            'Prices and availability may change without notice. We may correct any pricing errors and update your order accordingly.'
+            'To create and manage your account, process orders, and provide customer support.',
+            'To personalize your experience and improve our products and services.',
+            'To send service updates related to your orders or account.'
         ]
     },
     {
-        title: 'Orders and Payments',
+        title: 'Sharing of Information',
         items: [
-            'Orders are confirmed only after payment is received and verified.',
-            'We reserve the right to cancel or refuse orders for reasons such as stock issues, payment verification, or suspected fraud.'
+            'We may share information with trusted service providers (such as payment and delivery partners) to fulfill your orders.',
+            'We do not sell your personal information to third parties.'
         ]
     },
     {
-        title: 'Shipping and Returns',
+        title: 'Data Security',
         items: [
-            'Delivery timelines are estimates and may vary by location and order type.',
-            'Return, exchange, and cancellation policies will apply as stated in the app at the time of purchase.'
+            'We use reasonable technical and organizational measures to protect your data from unauthorized access, loss, or misuse.',
+            'No system is completely secure. Please keep your account credentials private.'
         ]
     },
     {
-        title: 'Intellectual Property',
+        title: 'Your Choices',
         items: [
-            'All content in the app, including logos, designs, and images, is owned by or licensed to DP Jewellers.',
-            'You may not copy, reproduce, or distribute any content without prior written permission.'
+            'You can update your profile information from the My Account section.',
+            'You may contact us to request access, correction, or deletion of your personal data where applicable.'
         ]
     },
     {
-        title: 'Limitation of Liability',
+        title: 'Children\'s Privacy',
         items: [
-            'DP Jewellers is not liable for indirect or incidental damages arising from the use of the app.',
-            'Our total liability, if any, is limited to the amount paid for the order in question.'
+            'The app is not intended for children under 13. We do not knowingly collect personal information from children.'
         ]
     },
     {
         title: 'Contact',
         items: [
-            'For questions about these Terms, please reach out via the Contact Us section in the app.'
+            'For questions about this Privacy Policy, please reach out via the Contact Us section in the app.'
         ]
     }
 ]
 
-const TermsAndConditionScreen = () => {
+const PrivacyPolicyScreen = () => {
 
     const navigation = useNavigation()
 
@@ -72,9 +73,9 @@ const TermsAndConditionScreen = () => {
             <View style={{ flex: 1 }}>
                 {header()}
                 <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: Sizes.fixPadding * 2.0 }}>
-                   
+                  
                     <View style={{ marginHorizontal: Sizes.fixPadding * 2.0, marginTop: Sizes.fixPadding }}>
-                        <Text style={{ ...Fonts.blackColor18SemiBold, fontSize: 22 }}>Terms and Conditions</Text>
+                        <Text style={{ ...Fonts.blackColor18SemiBold, fontSize: 22 }}>Privacy Policy</Text>
                     </View>
                     {sections.map((section) => renderSection(section))}
                 </ScrollView>
@@ -110,4 +111,4 @@ const TermsAndConditionScreen = () => {
     }
 }
 
-export default TermsAndConditionScreen
+export default PrivacyPolicyScreen
