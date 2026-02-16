@@ -808,9 +808,10 @@ exports.getHomePageData = onCall({ region: "asia-south1" }, async (_request) => 
         categoryWeights.set(key, (categoryWeights.get(key) || 0) + weight);
       };
 
-      // Views boost
-      recentViews.forEach((view) => {
-        addCategory(view.category, 3);
+      // Views boost (stronger signal)
+      recentViews.forEach((view, index) => {
+        const recencyBoost = Math.max(0, 5 - index); // more recent views weigh higher
+        addCategory(view.category, 6 + recencyBoost);
       });
 
       // Purchases boost

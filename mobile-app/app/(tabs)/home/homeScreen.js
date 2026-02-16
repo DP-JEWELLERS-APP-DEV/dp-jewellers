@@ -226,7 +226,8 @@ const HomeScreen = () => {
                             <>
                                 {banners()}
                                 {categoryInfo()}
-                                {recommendedInfo()}
+                                {signatureInfo()}
+                                {recommendedForYouInfo()}
                                 {popularInfo()}
                             </>
                         }
@@ -279,11 +280,21 @@ const HomeScreen = () => {
         )
     }
 
-    function recommendedInfo() {
-        // Fallback to popular when no featured items are available.
-        const recommendedSource = (recommended && recommended.length > 0) ? recommended : popular;
-        if (!recommendedSource || recommendedSource.length === 0) return null;
-        const productsWithFavorites = addFavoriteStatus(recommendedSource);
+    function uniqueByProductId(items, excludeIds = new Set()) {
+        const seen = new Set(excludeIds);
+        const result = [];
+        items.forEach((item) => {
+            const id = String(item?.productId || '');
+            if (!id || seen.has(id)) return;
+            seen.add(id);
+            result.push(item);
+        });
+        return result;
+    }
+
+    function signatureInfo() {
+        if (!featured || featured.length === 0) return null;
+        const productsWithFavorites = addFavoriteStatus(featured);
         return (
             <View style={{ marginTop: Sizes.fixPadding, marginBottom: Sizes.fixPadding / 2.0 }}>
                 <View style={{ width: '100%', paddingHorizontal: Sizes.fixPadding, alignItems: 'center', marginBottom: Sizes.fixPadding }}>
@@ -321,6 +332,40 @@ const HomeScreen = () => {
         )
     }
 
+    function recommendedForYouInfo() {
+        const excludeIds = new Set((featured || []).map((item) => String(item?.productId || '')));
+        const recommendedSource = uniqueByProductId(recommended || [], excludeIds);
+        const fallbackSource = uniqueByProductId(popular || [], excludeIds);
+        const dataSource = recommendedSource.length > 0 ? recommendedSource : fallbackSource;
+        if (!dataSource || dataSource.length === 0) return null;
+        const productsWithFavorites = addFavoriteStatus(dataSource);
+        return (
+            <View style={{ marginTop: Sizes.fixPadding, marginBottom: Sizes.fixPadding / 2.0 }}>
+                <View style={{ paddingHorizontal: Sizes.fixPadding, marginBottom: Sizes.fixPadding }}>
+                    <Text style={{ ...Fonts.blackColor18SemiBold, marginBottom: 2.0 }}>
+                        Recommended For You
+                    </Text>
+
+                </View>
+                <FlatList
+                    data={productsWithFavorites}
+                    keyExtractor={(item) => `${item.productId}`}
+                    renderItem={({ item }) => (
+                        <ProductCard
+                            item={item}
+                            horizontal
+                            showSnackBar={handleShowSnackBar}
+                            onFavoriteChange={handleFavoriteChange}
+                        />
+                    )}
+                    horizontal
+                    contentContainerStyle={{ paddingHorizontal: Sizes.fixPadding }}
+                    showsHorizontalScrollIndicator={false}
+                />
+            </View>
+        )
+    }
+
     function categoryInfo() {
         const renderItem = ({ item }) => (
             <TouchableOpacity
@@ -339,7 +384,7 @@ const HomeScreen = () => {
         )
         return (
             <View style={{ marginVertical: Sizes.fixPadding }}>
-               
+
                 <FlatList
                     data={categories}
                     keyExtractor={(item, index) => `${item}-${index}`}
