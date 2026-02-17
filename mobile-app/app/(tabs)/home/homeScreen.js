@@ -35,6 +35,7 @@ const HomeScreen = () => {
     const [recommended, setrecommended] = useState([]);
     const [popular, setpopular] = useState([]);
     const [bannerData, setBannerData] = useState([]);
+    const [customCollections, setCustomCollections] = useState([]);
     const [loading, setloading] = useState(true);
     const [errorText, seterrorText] = useState('');
     const [showSnackBar, setShowSnackBar] = useState(false);
@@ -75,6 +76,7 @@ const HomeScreen = () => {
         setrecommended(data?.recommended || apiFeatured);
         setpopular(data?.popular || []);
         setBannerData(data?.banners || []);
+        setCustomCollections(data?.customCollections || []);
     };
 
     const loadCachedHomeData = async () => {
@@ -99,6 +101,7 @@ const HomeScreen = () => {
                 recommended: data?.recommended || [],
                 popular: data?.popular || [],
                 banners: data?.banners || [],
+                customCollections: data?.customCollections || [],
                 cachedAt: Date.now(),
             }));
         } catch (err) {
@@ -228,6 +231,7 @@ const HomeScreen = () => {
                                 {categoryInfo()}
                                 {signatureInfo()}
                                 {recommendedForYouInfo()}
+                                {customCollections.map((col) => customCollectionSection(col))}
                                 {popularInfo()}
                             </>
                         }
@@ -330,6 +334,39 @@ const HomeScreen = () => {
                 />
             </View>
         )
+    }
+
+    function customCollectionSection(collection) {
+        const productsWithFavorites = addFavoriteStatus(collection.products || []);
+        if (productsWithFavorites.length === 0) return null;
+        return (
+            <View key={collection.id} style={{ marginTop: Sizes.fixPadding, marginBottom: Sizes.fixPadding / 2.0 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Sizes.fixPadding * 2.0, marginBottom: Sizes.fixPadding }}>
+                    <Text style={{ ...Fonts.blackColor18SemiBold }}>{collection.name}</Text>
+                    <TouchableOpacity
+                        activeOpacity={0.7}
+                        onPress={() => navigation.push('categoryWiseProducts/categoryWiseProductsScreen', { collectionId: collection.id, collectionName: collection.name })}
+                    >
+                        <Text style={{ ...Fonts.blackColor15Medium, color: Colors.primaryColor }}>Shop All</Text>
+                    </TouchableOpacity>
+                </View>
+                <FlatList
+                    data={productsWithFavorites}
+                    keyExtractor={(item) => `cc-${collection.id}-${item.productId}`}
+                    renderItem={({ item }) => (
+                        <ProductCard
+                            item={item}
+                            horizontal
+                            showSnackBar={handleShowSnackBar}
+                            onFavoriteChange={handleFavoriteChange}
+                        />
+                    )}
+                    horizontal
+                    contentContainerStyle={{ paddingHorizontal: Sizes.fixPadding }}
+                    showsHorizontalScrollIndicator={false}
+                />
+            </View>
+        );
     }
 
     function recommendedForYouInfo() {

@@ -791,6 +791,49 @@ exports.getHomePageData = onCall({ region: "asia-south1" }, async (_request) => 
     console.error("getHomePageData: banners query failed", err);
   }
 
+  let customCollections = [];
+  try {
+    const collectionsSnapshot = await db.collection("customCollections")
+      .where("isActive", "==", true)
+      .get();
+
+    for (const collectionDoc of collectionsSnapshot.docs) {
+      const data = collectionDoc.data();
+      const productIds = (data.productIds || []).slice(0, 6);
+      if (productIds.length === 0) continue;
+
+      const chunks = [];
+      for (let i = 0; i < productIds.length; i += 30) {
+        chunks.push(productIds.slice(i, i + 30));
+      }
+
+      const allDocs = [];
+      for (const chunk of chunks) {
+        const snap = await db.collection(PRODUCTS)
+          .where(admin.firestore.FieldPath.documentId(), "in", chunk)
+          .where("isActive", "==", true)
+          .get();
+        allDocs.push(...snap.docs);
+      }
+
+      const docMap = {};
+      allDocs.forEach((doc) => { docMap[doc.id] = doc; });
+
+      const products = productIds
+        .filter((id) => docMap[id])
+        .map((id) => mapProductDoc(docMap[id]));
+
+      if (products.length > 0) {
+        const createdAt = data.createdAt ? data.createdAt.toMillis() : 0;
+        customCollections.push({ id: collectionDoc.id, name: data.name, products, createdAt });
+      }
+    }
+    customCollections.sort((a, b) => b.createdAt - a.createdAt);
+    customCollections = customCollections.map(({ createdAt: _c, ...rest }) => rest);
+  } catch (err) {
+    console.error("getHomePageData: customCollections query failed", err);
+  }
+
   // Build personalized recommendations if user is authenticated.
   try {
     if (_request.auth) {
@@ -918,6 +961,7 @@ exports.getHomePageData = onCall({ region: "asia-south1" }, async (_request) => 
     recommended,
     popular,
     banners,
+    customCollections,
   };
 });
 
