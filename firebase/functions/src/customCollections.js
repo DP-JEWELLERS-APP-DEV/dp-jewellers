@@ -182,7 +182,7 @@ exports.getCustomCollectionProducts = onCall({ region: "asia-south1" }, async (r
   }
 
   const collectionDoc = await db.collection(COLLECTIONS).doc(collectionId).get();
-  if (!collectionDoc.exists || collectionDoc.data().isActive === false) {
+  if (!collectionDoc.exists) {
     throw new HttpsError("not-found", "Collection not found.");
   }
 
