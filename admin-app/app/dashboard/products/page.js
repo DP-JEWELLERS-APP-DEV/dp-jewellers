@@ -38,6 +38,10 @@ import {
   Archive,
   RestoreFromTrash,
   Search,
+  Star,
+  StarBorder,
+  LocalFireDepartment,
+  FiberNew,
 } from '@mui/icons-material';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
@@ -128,6 +132,9 @@ const emptyForm = {
   defaultMetalType: 'Gold',
   defaultPurity: '',
   fixedMetals: [],
+  featured: false,
+  bestseller: false,
+  newArrival: true,
 };
 
 export default function ProductsPage() {
@@ -153,7 +160,27 @@ export default function ProductsPage() {
   const [filterMaterial, setFilterMaterial] = useState([]);
   const [searchInput, setSearchInput] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [filterVisibility, setFilterVisibility] = useState('all');
   const [collapsedMetalEntries, setCollapsedMetalEntries] = useState({});
+
+  // Quick toggle handler for featured/bestseller/newArrival
+  const handleQuickToggle = async (productId, field) => {
+    const product = products.find((p) => p.productId === productId);
+    if (!product) return;
+    const newValue = !product[field];
+    try {
+      const updateProduct = httpsCallable(functions, 'updateProduct');
+      await updateProduct({ productId, [field]: newValue });
+      setProducts((prev) =>
+        prev.map((p) =>
+          p.productId === productId ? { ...p, [field]: newValue } : p
+        )
+      );
+    } catch (err) {
+      console.error('Toggle failed:', err);
+      setError('Failed to update product: ' + (err.message || ''));
+    }
+  };
 
   useEffect(() => {
     fetchProducts();
@@ -285,7 +312,11 @@ export default function ProductsPage() {
         metalEntries,
         defaultMetalType,
         defaultPurity,
+
         fixedMetals: fixedMetalsData,
+        featured: product.featured || false,
+        bestseller: product.bestseller || false,
+        newArrival: product.newArrival !== undefined ? product.newArrival : true,
       });
       setShowDiamond(diamond.hasDiamond || false);
       setExistingImages(product.images || []);
@@ -754,6 +785,9 @@ export default function ProductsPage() {
           certificateNumber: formData.huidNumber,
         } : {},
         status: formData.status,
+        featured: formData.featured,
+        bestseller: formData.bestseller,
+        newArrival: formData.newArrival,
       };
 
       // Serialize configurator (always enabled)
@@ -933,8 +967,17 @@ export default function ProductsPage() {
       const codeMatch = (p.productCode || '').toLowerCase().includes(q);
       if (!nameMatch && !codeMatch) return false;
     }
+    if (filterVisibility === 'featured' && !p.featured) return false;
+    if (filterVisibility === 'bestseller' && !p.bestseller) return false;
+    if (filterVisibility === 'newArrival' && !p.newArrival) return false;
     return true;
   });
+
+  const visibilityCounts = {
+    featured: products.filter((p) => p.featured).length,
+    bestseller: products.filter((p) => p.bestseller).length,
+    newArrival: products.filter((p) => p.newArrival).length,
+  };
 
   const handleSearch = () => {
     setSearchQuery(searchInput);
@@ -1012,6 +1055,37 @@ export default function ProductsPage() {
         </Box>
       </Box>
 
+      {/* Visibility Filter Chips */}
+      <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap' }}>
+        <Chip
+          label="All"
+          onClick={() => setFilterVisibility('all')}
+          variant={filterVisibility === 'all' ? 'filled' : 'outlined'}
+          sx={filterVisibility === 'all' ? { backgroundColor: '#1E1B4B', color: '#fff' } : { borderColor: '#1E1B4B', color: '#1E1B4B' }}
+        />
+        <Chip
+          icon={<Star sx={{ fontSize: 16 }} />}
+          label={`DP Signature (${visibilityCounts.featured})`}
+          onClick={() => setFilterVisibility(filterVisibility === 'featured' ? 'all' : 'featured')}
+          variant={filterVisibility === 'featured' ? 'filled' : 'outlined'}
+          sx={filterVisibility === 'featured' ? { backgroundColor: '#B8860B', color: '#fff', '& .MuiChip-icon': { color: '#fff' } } : { borderColor: '#B8860B', color: '#B8860B', '& .MuiChip-icon': { color: '#B8860B' } }}
+        />
+        <Chip
+          icon={<LocalFireDepartment sx={{ fontSize: 16 }} />}
+          label={`Bestsellers (${visibilityCounts.bestseller})`}
+          onClick={() => setFilterVisibility(filterVisibility === 'bestseller' ? 'all' : 'bestseller')}
+          variant={filterVisibility === 'bestseller' ? 'filled' : 'outlined'}
+          sx={filterVisibility === 'bestseller' ? { backgroundColor: '#d32f2f', color: '#fff', '& .MuiChip-icon': { color: '#fff' } } : { borderColor: '#d32f2f', color: '#d32f2f', '& .MuiChip-icon': { color: '#d32f2f' } }}
+        />
+        <Chip
+          icon={<FiberNew sx={{ fontSize: 16 }} />}
+          label={`New Arrivals (${visibilityCounts.newArrival})`}
+          onClick={() => setFilterVisibility(filterVisibility === 'newArrival' ? 'all' : 'newArrival')}
+          variant={filterVisibility === 'newArrival' ? 'filled' : 'outlined'}
+          sx={filterVisibility === 'newArrival' ? { backgroundColor: '#1565c0', color: '#fff', '& .MuiChip-icon': { color: '#fff' } } : { borderColor: '#1565c0', color: '#1565c0', '& .MuiChip-icon': { color: '#1565c0' } }}
+        />
+      </Box>
+
       {success && <Alert severity="success" className="!mb-4" onClose={() => setSuccess('')}>{success}</Alert>}
       {error && <Alert severity="error" className="!mb-4" onClose={() => setError('')}>{error}</Alert>}
 
@@ -1086,37 +1160,69 @@ export default function ProductsPage() {
                 ),
               },
               {
+                field: 'tags',
+                headerName: 'Tags',
+                width: 200,
+                sortable: false,
+                renderCell: (params) => (
+                  <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', alignItems: 'center', height: '100%' }}>
+                    {params.row.featured && <Chip label="Signature" size="small" sx={{ backgroundColor: '#B8860B', color: '#fff', fontSize: 11, height: 22 }} />}
+                    {params.row.bestseller && <Chip label="Bestseller" size="small" sx={{ backgroundColor: '#d32f2f', color: '#fff', fontSize: 11, height: 22 }} />}
+                    {params.row.newArrival && <Chip label="New" size="small" sx={{ backgroundColor: '#1565c0', color: '#fff', fontSize: 11, height: 22 }} />}
+                    {!params.row.featured && !params.row.bestseller && !params.row.newArrival && (
+                      <Typography variant="caption" sx={{ color: '#999' }}>—</Typography>
+                    )}
+                  </Box>
+                ),
+              },
+              {
                 field: 'actions',
                 headerName: 'Actions',
-                width: 150,
+                width: 230,
                 sortable: false,
                 filterable: false,
                 renderCell: (params) => (
-                  <>
+                  <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                    <Tooltip title={params.row.featured ? 'Remove from DP Signature' : 'Add to DP Signature'} arrow>
+                      <IconButton size="small" onClick={() => handleQuickToggle(params.row.productId, 'featured')} sx={{ color: params.row.featured ? '#B8860B' : '#ccc', mr: 0.25 }}>
+                        {params.row.featured ? <Star fontSize="small" /> : <StarBorder fontSize="small" />}
+                      </IconButton>
+                    </Tooltip>
+                    <Tooltip title={params.row.bestseller ? 'Remove from Bestsellers' : 'Add to Bestsellers'} arrow>
+                      <IconButton size="small" onClick={() => handleQuickToggle(params.row.productId, 'bestseller')} sx={{ color: params.row.bestseller ? '#d32f2f' : '#ccc', mr: 0.25 }}>
+                        <LocalFireDepartment fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                    <Tooltip title={params.row.newArrival ? 'Remove New Arrival tag' : 'Mark as New Arrival'} arrow>
+                      <IconButton size="small" onClick={() => handleQuickToggle(params.row.productId, 'newArrival')} sx={{ color: params.row.newArrival ? '#1565c0' : '#ccc', mr: 0.25 }}>
+                        <FiberNew fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                    <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
                     <Tooltip title="Edit product details" arrow>
                       <IconButton size="small" onClick={() => handleOpenDialog(params.row)} sx={{ color: '#1E1B4B', mr: 0.5 }}>
                         <Edit fontSize="small" />
                       </IconButton>
                     </Tooltip>
-                    <Tooltip title="Soft delete: Product will be permanently removed from the system" arrow>
+                    <Tooltip title="Soft delete" arrow>
                       <IconButton size="small" onClick={() => handleDelete(params.row.productId)} sx={{ color: '#d32f2f', mr: 0.5 }}>
                         <Delete fontSize="small" />
                       </IconButton>
                     </Tooltip>
                     {getProductStatus(params.row) !== 'archived' ? (
-                      <Tooltip title="Archive: Product will be hidden from customers but can be restored later" arrow>
+                      <Tooltip title="Archive" arrow>
                         <IconButton size="small" onClick={() => handleArchive(params.row.productId)} sx={{ color: '#ed6c02' }}>
                           <Archive fontSize="small" />
                         </IconButton>
                       </Tooltip>
                     ) : (
-                      <Tooltip title="Restore: Make product visible to customers again" arrow>
+                      <Tooltip title="Restore" arrow>
                         <IconButton size="small" onClick={() => handleRestore(params.row.productId)} sx={{ color: '#2e7d32' }}>
                           <RestoreFromTrash fontSize="small" />
                         </IconButton>
                       </Tooltip>
                     )}
-                  </>
+                  </Box>
                 ),
               },
             ]}
@@ -1226,9 +1332,9 @@ export default function ProductsPage() {
             </Typography>
           </Box>
 
-            <Box sx={{ mb: 3 }}>
-              {/* Default Metal Type & Default Purity — only when multiple metal entries */}
-              {formData.metalEntries.length > 1 && (
+          <Box sx={{ mb: 3 }}>
+            {/* Default Metal Type & Default Purity — only when multiple metal entries */}
+            {formData.metalEntries.length > 1 && (
               <Grid container spacing={2} sx={{ mb: 2 }}>
                 <Grid item xs={6} sm={4}>
                   <TextField select fullWidth size="small" label="Default Metal Type"
@@ -1253,46 +1359,46 @@ export default function ProductsPage() {
                   </TextField>
                 </Grid>
               </Grid>
-              )}
+            )}
 
-              {fieldErrors.metalVariants && (
-                <Chip label="At least one metal type with a purity variant and weight is required" color="error" size="small" sx={{ mb: 2 }} />
-              )}
+            {fieldErrors.metalVariants && (
+              <Chip label="At least one metal type with a purity variant and weight is required" color="error" size="small" sx={{ mb: 2 }} />
+            )}
 
-              {/* Metal Type Blocks */}
-              {formData.metalEntries.map((metalEntry, mIdx) => {
-                const usedTypes = formData.metalEntries.map((e) => e.type);
-                const availableTypes = materials.filter((m) => m === metalEntry.type || !usedTypes.includes(m));
-                const isGold = metalEntry.type === 'Gold';
-                const isCollapsed = collapsedMetalEntries[mIdx];
-                const metalPreview = calculateMetalEntryPreview(metalEntry);
-                const isSingleEntry = formData.metalEntries.length === 1;
+            {/* Metal Type Blocks */}
+            {formData.metalEntries.map((metalEntry, mIdx) => {
+              const usedTypes = formData.metalEntries.map((e) => e.type);
+              const availableTypes = materials.filter((m) => m === metalEntry.type || !usedTypes.includes(m));
+              const isGold = metalEntry.type === 'Gold';
+              const isCollapsed = collapsedMetalEntries[mIdx];
+              const metalPreview = calculateMetalEntryPreview(metalEntry);
+              const isSingleEntry = formData.metalEntries.length === 1;
 
-                return (
-                  <Box key={`me-${mIdx}`} sx={{ mb: 2, backgroundColor: '#f0f0f7', borderRadius: 2, border: '1px solid #c0c0d0' }}>
-                    {/* Header — collapsible when multiple entries, flat when single */}
-                    {isSingleEntry ? (
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 2 }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                          <Typography variant="body1" sx={{ fontWeight: 'bold', color: '#1E1B4B' }}>
-                            {metalEntry.type}
+              return (
+                <Box key={`me-${mIdx}`} sx={{ mb: 2, backgroundColor: '#f0f0f7', borderRadius: 2, border: '1px solid #c0c0d0' }}>
+                  {/* Header — collapsible when multiple entries, flat when single */}
+                  {isSingleEntry ? (
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 2 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                        <Typography variant="body1" sx={{ fontWeight: 'bold', color: '#1E1B4B' }}>
+                          {metalEntry.type}
+                        </Typography>
+                        <Chip size="small" label={`${metalEntry.purityVariants.filter((v) => v.purity).length} variant(s)`} sx={{ backgroundColor: '#1E1B4B', color: '#fff', fontSize: 11 }} />
+                        {metalPreview && (
+                          <Typography variant="body2" sx={{ color: '#666' }}>
+                            Est. ₹{metalPreview.finalPrice.toLocaleString('en-IN')}
                           </Typography>
-                          <Chip size="small" label={`${metalEntry.purityVariants.filter((v) => v.purity).length} variant(s)`} sx={{ backgroundColor: '#1E1B4B', color: '#fff', fontSize: 11 }} />
-                          {metalPreview && (
-                            <Typography variant="body2" sx={{ color: '#666' }}>
-                              Est. ₹{metalPreview.finalPrice.toLocaleString('en-IN')}
-                            </Typography>
-                          )}
-                        </Box>
-                        <TextField select size="small" label="Metal Type"
-                          value={metalEntry.type}
-                          onChange={(e) => handleMetalEntryTypeChange(mIdx, e.target.value)}
-                          sx={{ minWidth: 120 }}
-                        >
-                          {availableTypes.map((m) => <MenuItem key={`me-${mIdx}-${m}`} value={m}>{m}</MenuItem>)}
-                        </TextField>
+                        )}
                       </Box>
-                    ) : (
+                      <TextField select size="small" label="Metal Type"
+                        value={metalEntry.type}
+                        onChange={(e) => handleMetalEntryTypeChange(mIdx, e.target.value)}
+                        sx={{ minWidth: 120 }}
+                      >
+                        {availableTypes.map((m) => <MenuItem key={`me-${mIdx}-${m}`} value={m}>{m}</MenuItem>)}
+                      </TextField>
+                    </Box>
+                  ) : (
                     <Box
                       sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 2, cursor: 'pointer', '&:hover': { backgroundColor: '#e8e8f0' }, borderRadius: isCollapsed ? 2 : '8px 8px 0 0' }}
                       onClick={() => toggleMetalEntryCollapse(mIdx)}
@@ -1322,370 +1428,370 @@ export default function ProductsPage() {
                         </IconButton>
                       </Box>
                     </Box>
-                    )}
+                  )}
 
-                    {/* Body — always shown for single entry, collapsible for multiple */}
-                    {(isSingleEntry || !isCollapsed) && (
-                      <Box sx={{ p: 2, pt: 0 }}>
-                        {/* Purity Variants within this metal */}
-                        {metalEntry.purityVariants.map((variant, vIdx) => (
-                          <Box key={`me-${mIdx}-pv-${vIdx}`} sx={{ mb: 2, p: 2, backgroundColor: '#f9f9f9', borderRadius: 2, border: '1px solid #e0e0e0' }}>
-                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
-                              <Typography variant="body2" sx={{ fontWeight: 'bold', color: '#1E1B4B' }}>
-                                {variant.purity || `Variant ${vIdx + 1}`}
-                              </Typography>
-                              {metalEntry.purityVariants.length > 1 && (
-                                <IconButton size="small" onClick={() => handleRemovePurityVariant(mIdx, vIdx)} sx={{ color: '#d32f2f' }}>
-                                  <Close sx={{ fontSize: 16 }} />
-                                </IconButton>
-                              )}
-                            </Box>
-
-                            {/* Purity & Base Weights */}
-                            <Grid container spacing={2} sx={{ mb: 1.5 }}>
-                              <Grid item xs={4} sm={3}>
-                                <TextField select fullWidth size="small" label="Purity"
-                                  value={variant.purity}
-                                  onChange={(e) => handlePurityVariantChange(mIdx, vIdx, 'purity', e.target.value)}
-                                  sx={{ minWidth: 100 }}
-                                >
-                                  {getPuritiesForMetal(metalEntry.type).map((p) => (
-                                    <MenuItem key={`me-${mIdx}-pv-${vIdx}-${p}`} value={p}>{p}</MenuItem>
-                                  ))}
-                                </TextField>
-                              </Grid>
-                              <Grid item xs={4} sm={3}>
-                                <TextField fullWidth size="small" label="Net Weight (g)" type="number"
-                                  value={variant.netWeight}
-                                  onChange={(e) => handlePurityVariantChange(mIdx, vIdx, 'netWeight', e.target.value)}
-                                />
-                              </Grid>
-                              <Grid item xs={4} sm={3}>
-                                <TextField fullWidth size="small" label="Gross Weight (g)" type="number"
-                                  value={variant.grossWeight}
-                                  onChange={(e) => handlePurityVariantChange(mIdx, vIdx, 'grossWeight', e.target.value)}
-                                />
-                              </Grid>
-                            </Grid>
-
-                            {/* Colors (only for Gold) */}
-                            {isGold && (
-                              <>
-                                <Typography variant="caption" sx={{ color: '#666' }}>Gold Colors</Typography>
-                                <FormGroup row sx={{ mb: 1 }}>
-                                  {goldOptionsList.map((opt) => (
-                                    <FormControlLabel key={`me-${mIdx}-pv-${vIdx}-color-${opt.value}`}
-                                      control={<Checkbox size="small"
-                                        checked={(variant.availableColors || []).includes(opt.value)}
-                                        onChange={() => handlePurityVariantColorToggle(mIdx, vIdx, opt.value)}
-                                        sx={{ color: '#1E1B4B', '&.Mui-checked': { color: '#1E1B4B' } }}
-                                      />}
-                                      label={opt.label}
-                                    />
-                                  ))}
-                                  {(variant.availableColors || []).length > 1 && (
-                                    <TextField select size="small" label="Default Color" sx={{ ml: 2, minWidth: 170 }}
-                                      value={variant.defaultColor || ''}
-                                      onChange={(e) => handlePurityVariantChange(mIdx, vIdx, 'defaultColor', e.target.value)}
-                                    >
-                                      {(variant.availableColors || []).map((c) => (
-                                        <MenuItem key={`me-${mIdx}-pv-${vIdx}-dc-${c}`} value={c}>
-                                          {goldOptionsList.find((o) => o.value === c)?.label || c}
-                                        </MenuItem>
-                                      ))}
-                                    </TextField>
-                                  )}
-                                </FormGroup>
-                              </>
+                  {/* Body — always shown for single entry, collapsible for multiple */}
+                  {(isSingleEntry || !isCollapsed) && (
+                    <Box sx={{ p: 2, pt: 0 }}>
+                      {/* Purity Variants within this metal */}
+                      {metalEntry.purityVariants.map((variant, vIdx) => (
+                        <Box key={`me-${mIdx}-pv-${vIdx}`} sx={{ mb: 2, p: 2, backgroundColor: '#f9f9f9', borderRadius: 2, border: '1px solid #e0e0e0' }}>
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
+                            <Typography variant="body2" sx={{ fontWeight: 'bold', color: '#1E1B4B' }}>
+                              {variant.purity || `Variant ${vIdx + 1}`}
+                            </Typography>
+                            {metalEntry.purityVariants.length > 1 && (
+                              <IconButton size="small" onClick={() => handleRemovePurityVariant(mIdx, vIdx)} sx={{ color: '#d32f2f' }}>
+                                <Close sx={{ fontSize: 16 }} />
+                              </IconButton>
                             )}
+                          </Box>
 
-                            {/* Diamond Qualities (only if product has diamonds) */}
-                            {formData.hasDiamond && (
-                              <Box sx={{ mb: 1 }}>
-                                <Typography variant="caption" sx={{ color: '#666' }}>Diamond Qualities</Typography>
-                                <FormGroup row>
-                                  {diamondQualityBuckets.map((q) => (
-                                    <FormControlLabel key={`me-${mIdx}-pv-${vIdx}-dq-${q}`}
-                                      control={<Checkbox size="small"
-                                        checked={(variant.availableDiamondQualities || []).includes(q)}
-                                        onChange={() => handlePurityVariantDiamondToggle(mIdx, vIdx, q)}
-                                        sx={{ color: '#1E1B4B', '&.Mui-checked': { color: '#1E1B4B' } }}
-                                      />}
-                                      label={diamondQualityLabels[q] || q}
-                                    />
-                                  ))}
-                                </FormGroup>
-                                {(variant.availableDiamondQualities || []).length > 1 && (
-                                  <TextField select size="small" label="Default Diamond Quality" sx={{ minWidth: 210 }}
-                                    value={variant.defaultDiamondQuality || 'SI_IJ'}
-                                    onChange={(e) => handlePurityVariantChange(mIdx, vIdx, 'defaultDiamondQuality', e.target.value)}
+                          {/* Purity & Base Weights */}
+                          <Grid container spacing={2} sx={{ mb: 1.5 }}>
+                            <Grid item xs={4} sm={3}>
+                              <TextField select fullWidth size="small" label="Purity"
+                                value={variant.purity}
+                                onChange={(e) => handlePurityVariantChange(mIdx, vIdx, 'purity', e.target.value)}
+                                sx={{ minWidth: 100 }}
+                              >
+                                {getPuritiesForMetal(metalEntry.type).map((p) => (
+                                  <MenuItem key={`me-${mIdx}-pv-${vIdx}-${p}`} value={p}>{p}</MenuItem>
+                                ))}
+                              </TextField>
+                            </Grid>
+                            <Grid item xs={4} sm={3}>
+                              <TextField fullWidth size="small" label="Net Weight (g)" type="number"
+                                value={variant.netWeight}
+                                onChange={(e) => handlePurityVariantChange(mIdx, vIdx, 'netWeight', e.target.value)}
+                              />
+                            </Grid>
+                            <Grid item xs={4} sm={3}>
+                              <TextField fullWidth size="small" label="Gross Weight (g)" type="number"
+                                value={variant.grossWeight}
+                                onChange={(e) => handlePurityVariantChange(mIdx, vIdx, 'grossWeight', e.target.value)}
+                              />
+                            </Grid>
+                          </Grid>
+
+                          {/* Colors (only for Gold) */}
+                          {isGold && (
+                            <>
+                              <Typography variant="caption" sx={{ color: '#666' }}>Gold Colors</Typography>
+                              <FormGroup row sx={{ mb: 1 }}>
+                                {goldOptionsList.map((opt) => (
+                                  <FormControlLabel key={`me-${mIdx}-pv-${vIdx}-color-${opt.value}`}
+                                    control={<Checkbox size="small"
+                                      checked={(variant.availableColors || []).includes(opt.value)}
+                                      onChange={() => handlePurityVariantColorToggle(mIdx, vIdx, opt.value)}
+                                      sx={{ color: '#1E1B4B', '&.Mui-checked': { color: '#1E1B4B' } }}
+                                    />}
+                                    label={opt.label}
+                                  />
+                                ))}
+                                {(variant.availableColors || []).length > 1 && (
+                                  <TextField select size="small" label="Default Color" sx={{ ml: 2, minWidth: 170 }}
+                                    value={variant.defaultColor || ''}
+                                    onChange={(e) => handlePurityVariantChange(mIdx, vIdx, 'defaultColor', e.target.value)}
                                   >
-                                    {(variant.availableDiamondQualities || []).map((q) => (
-                                      <MenuItem key={`me-${mIdx}-pv-${vIdx}-ddq-${q}`} value={q}>{diamondQualityLabels[q] || q}</MenuItem>
+                                    {(variant.availableColors || []).map((c) => (
+                                      <MenuItem key={`me-${mIdx}-pv-${vIdx}-dc-${c}`} value={c}>
+                                        {goldOptionsList.find((o) => o.value === c)?.label || c}
+                                      </MenuItem>
                                     ))}
                                   </TextField>
                                 )}
-                              </Box>
-                            )}
+                              </FormGroup>
+                            </>
+                          )}
 
-                            {/* Sizes with per-size weights */}
-                            <Typography variant="caption" sx={{ color: '#666', mt: 1, display: 'block' }}>Sizes & Weights</Typography>
-                            {(variant.sizes || []).length > 0 && (
-                              <Grid container spacing={1} sx={{ mb: 0.5 }}>
-                                <Grid item xs={3}><Typography variant="caption" sx={{ color: '#999' }}>Size</Typography></Grid>
-                                <Grid item xs={3}><Typography variant="caption" sx={{ color: '#999' }}>Net Wt (g)</Typography></Grid>
-                                <Grid item xs={3}><Typography variant="caption" sx={{ color: '#999' }}>Gross Wt (g)</Typography></Grid>
-                                <Grid item xs={3} />
-                              </Grid>
-                            )}
-                            {(variant.sizes || []).map((sz, sIdx) => (
-                              <Grid container spacing={1} key={`me-${mIdx}-pv-${vIdx}-sz-${sIdx}`} sx={{ mb: 0.5 }}>
-                                <Grid item xs={3}>
-                                  <TextField size="small" fullWidth value={sz.size} placeholder="e.g., 14"
-                                    onChange={(e) => handleVariantSizeChange(mIdx, vIdx, sIdx, 'size', e.target.value)}
+                          {/* Diamond Qualities (only if product has diamonds) */}
+                          {formData.hasDiamond && (
+                            <Box sx={{ mb: 1 }}>
+                              <Typography variant="caption" sx={{ color: '#666' }}>Diamond Qualities</Typography>
+                              <FormGroup row>
+                                {diamondQualityBuckets.map((q) => (
+                                  <FormControlLabel key={`me-${mIdx}-pv-${vIdx}-dq-${q}`}
+                                    control={<Checkbox size="small"
+                                      checked={(variant.availableDiamondQualities || []).includes(q)}
+                                      onChange={() => handlePurityVariantDiamondToggle(mIdx, vIdx, q)}
+                                      sx={{ color: '#1E1B4B', '&.Mui-checked': { color: '#1E1B4B' } }}
+                                    />}
+                                    label={diamondQualityLabels[q] || q}
                                   />
-                                </Grid>
-                                <Grid item xs={3}>
-                                  <TextField size="small" fullWidth type="number" value={sz.netWeight} placeholder="2.5"
-                                    onChange={(e) => handleVariantSizeChange(mIdx, vIdx, sIdx, 'netWeight', e.target.value)}
-                                  />
-                                </Grid>
-                                <Grid item xs={3}>
-                                  <TextField size="small" fullWidth type="number" value={sz.grossWeight} placeholder="2.8"
-                                    onChange={(e) => handleVariantSizeChange(mIdx, vIdx, sIdx, 'grossWeight', e.target.value)}
-                                  />
-                                </Grid>
-                                <Grid item xs={3}>
-                                  <IconButton size="small" onClick={() => handleRemoveVariantSize(mIdx, vIdx, sIdx)} sx={{ color: '#d32f2f' }}>
-                                    <Close sx={{ fontSize: 16 }} />
-                                  </IconButton>
-                                </Grid>
-                              </Grid>
-                            ))}
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mt: 0.5 }}>
-                              <Button size="small" startIcon={<Add />} onClick={() => handleAddVariantSize(mIdx, vIdx)}
-                                sx={{ textTransform: 'none', color: '#1E1B4B' }}
-                              >
-                                Add Size
-                              </Button>
-                              {(variant.sizes || []).filter((s) => s.size).length > 0 && (
-                                <TextField select size="small" label="Default Size" sx={{ minWidth: 150 }}
-                                  value={variant.defaultSize || ''}
-                                  onChange={(e) => handlePurityVariantChange(mIdx, vIdx, 'defaultSize', e.target.value)}
+                                ))}
+                              </FormGroup>
+                              {(variant.availableDiamondQualities || []).length > 1 && (
+                                <TextField select size="small" label="Default Diamond Quality" sx={{ minWidth: 210 }}
+                                  value={variant.defaultDiamondQuality || 'SI_IJ'}
+                                  onChange={(e) => handlePurityVariantChange(mIdx, vIdx, 'defaultDiamondQuality', e.target.value)}
                                 >
-                                  {(variant.sizes || []).filter((s) => s.size).map((s) => (
-                                    <MenuItem key={`me-${mIdx}-pv-${vIdx}-ds-${s.size}`} value={s.size}>{s.size}</MenuItem>
+                                  {(variant.availableDiamondQualities || []).map((q) => (
+                                    <MenuItem key={`me-${mIdx}-pv-${vIdx}-ddq-${q}`} value={q}>{diamondQualityLabels[q] || q}</MenuItem>
                                   ))}
                                 </TextField>
                               )}
                             </Box>
-                          </Box>
-                        ))}
+                          )}
 
-                        <Button size="small" startIcon={<Add />} onClick={() => handleAddPurityVariant(mIdx)}
-                          sx={{ textTransform: 'none', color: '#1E1B4B', mb: 2 }}
-                        >
-                          Add Purity Variant
-                        </Button>
-
-                        {/* Per-Metal Pricing & Charges */}
-                        <Divider sx={{ my: 1.5, borderStyle: 'dashed' }} />
-                        <Typography variant="body2" sx={{ fontWeight: 'bold', color: '#1E1B4B', mb: 1 }}>
-                          Charges & Tax for {metalEntry.type}
-                        </Typography>
-                        <Grid container spacing={2} sx={{ mb: 1 }}>
-                          <Grid item xs={6} sm={3}>
-                            <TextField fullWidth size="small" select label="Making Charge Type"
-                              value={metalEntry.makingChargeType || 'percentage'}
-                              onChange={(e) => handleMetalEntryPricingChange(mIdx, 'makingChargeType', e.target.value)}
-                            >
-                              <MenuItem value="percentage">Percentage (%)</MenuItem>
-                              <MenuItem value="flat_per_gram">Per Gram (₹)</MenuItem>
-                              <MenuItem value="fixed_amount">Fixed Amount (₹)</MenuItem>
-                            </TextField>
-                          </Grid>
-                          <Grid item xs={6} sm={2}>
-                            <TextField fullWidth size="small" type="number"
-                              label={metalEntry.makingChargeType === 'percentage' ? 'Making (%)' : 'Making (₹)'}
-                              value={metalEntry.makingChargeValue}
-                              onChange={(e) => handleMetalEntryPricingChange(mIdx, 'makingChargeValue', e.target.value)}
-                            />
-                          </Grid>
-                          <Grid item xs={6} sm={3}>
-                            <TextField fullWidth size="small" select label="Wastage Charge Type"
-                              value={metalEntry.wastageChargeType || 'percentage'}
-                              onChange={(e) => handleMetalEntryPricingChange(mIdx, 'wastageChargeType', e.target.value)}
-                            >
-                              <MenuItem value="percentage">Percentage (%)</MenuItem>
-                              <MenuItem value="fixed">Fixed Amount (₹)</MenuItem>
-                            </TextField>
-                          </Grid>
-                          <Grid item xs={6} sm={2}>
-                            <TextField fullWidth size="small" type="number"
-                              label={metalEntry.wastageChargeType === 'percentage' ? 'Wastage (%)' : 'Wastage (₹)'}
-                              value={metalEntry.wastageChargeValue}
-                              onChange={(e) => handleMetalEntryPricingChange(mIdx, 'wastageChargeValue', e.target.value)}
-                            />
-                          </Grid>
-                        </Grid>
-                        <Grid container spacing={2} sx={{ mb: 1 }}>
-                          <Grid item xs={6} sm={3}>
-                            <TextField fullWidth size="small" type="number" label="GST on Jewelry (%)"
-                              value={metalEntry.jewelryGst}
-                              onChange={(e) => handleMetalEntryPricingChange(mIdx, 'jewelryGst', e.target.value)}
-                              placeholder="Default: 3%"
-                            />
-                          </Grid>
-                          <Grid item xs={6} sm={3}>
-                            <TextField fullWidth size="small" type="number" label="GST on Making (%)"
-                              value={metalEntry.makingGst}
-                              onChange={(e) => handleMetalEntryPricingChange(mIdx, 'makingGst', e.target.value)}
-                              placeholder="Default: 5%"
-                            />
-                          </Grid>
-                        </Grid>
-
-                        {/* Per-Metal Price Preview */}
-                        {metalPreview && (
-                          <Box sx={{ mt: 1.5, p: 1.5, backgroundColor: '#F5F5F5', borderRadius: 1.5, border: '1px solid #E0E0E0' }}>
-                            <Typography variant="caption" sx={{ fontWeight: 'bold', color: '#1E1B4B', display: 'block', mb: 0.5 }}>
-                              Price Preview ({metalPreview.variantLabel})
-                            </Typography>
-                            <Grid container spacing={0.5} sx={{display: 'flex', flexDirection: 'column'}}>
-                              {metalPreview.metalBreakdown.map((m, i) => (
-                                <React.Fragment key={i}>
-                                  <Grid item xs={8}>
-                                    <Typography variant="caption" sx={{ color: '#666' }}>
-                                      {m.type} ({m.purity?.replace('_', ' ')}): {m.weight}g × ₹{m.rate.toLocaleString('en-IN')}/g
-                                    </Typography>
-                                  </Grid>
-                                  <Grid item xs={4} sx={{ textAlign: 'right' }}>
-                                    <Typography variant="caption">₹{m.value.toLocaleString('en-IN')}</Typography>
-                                  </Grid>
-                                </React.Fragment>
-                              ))}
-                              {metalPreview.diamondValue > 0 && (
-                                <>
-                                  <Grid item xs={8}><Typography variant="caption" sx={{ color: '#666' }}>Diamond Value</Typography></Grid>
-                                  <Grid item xs={4} sx={{ textAlign: 'right' }}><Typography variant="caption">₹{metalPreview.diamondValue.toLocaleString('en-IN')}</Typography></Grid>
-                                </>
-                              )}
-                              <Grid item xs={8}><Typography variant="caption" sx={{ color: '#666' }}>Making ({metalPreview.mcType === 'percentage' ? `${metalPreview.mcValue}%` : `₹${metalPreview.mcValue}`})</Typography></Grid>
-                              <Grid item xs={4} sx={{ textAlign: 'right' }}><Typography variant="caption">₹{metalPreview.makingChargeAmount.toLocaleString('en-IN')}</Typography></Grid>
-                              {metalPreview.wastageChargeAmount > 0 && (
-                                <>
-                                  <Grid item xs={8}><Typography variant="caption" sx={{ color: '#666' }}>Wastage ({metalPreview.wcType === 'percentage' ? `${metalPreview.wcValue}%` : `₹${metalPreview.wcValue}`})</Typography></Grid>
-                                  <Grid item xs={4} sx={{ textAlign: 'right' }}><Typography variant="caption">₹{metalPreview.wastageChargeAmount.toLocaleString('en-IN')}</Typography></Grid>
-                                </>
-                              )}
-                              <Grid item xs={8}><Typography variant="caption" sx={{ color: '#666' }}>GST ({metalPreview.jewelryTaxRate}% + {metalPreview.makingTaxRate}%)</Typography></Grid>
-                              <Grid item xs={4} sx={{ textAlign: 'right' }}><Typography variant="caption">₹{metalPreview.totalTax.toLocaleString('en-IN')}</Typography></Grid>
-                              {metalPreview.discount > 0 && (
-                                <>
-                                  <Grid item xs={8}><Typography variant="caption" sx={{ color: '#4CAF50' }}>Discount</Typography></Grid>
-                                  <Grid item xs={4} sx={{ textAlign: 'right' }}><Typography variant="caption" sx={{ color: '#4CAF50' }}>-₹{metalPreview.discount.toLocaleString('en-IN')}</Typography></Grid>
-                                </>
-                              )}
-                              <Grid item xs={12}><Divider sx={{ my: 0.3 }} /></Grid>
-                              <Grid item xs={8}><Typography variant="caption" sx={{ fontWeight: 'bold', color: '#1E1B4B' }}>Final Price</Typography></Grid>
-                              <Grid item xs={4} sx={{ textAlign: 'right' }}><Typography variant="caption" sx={{ fontWeight: 'bold', color: '#1E1B4B' }}>₹{metalPreview.finalPrice.toLocaleString('en-IN')}</Typography></Grid>
+                          {/* Sizes with per-size weights */}
+                          <Typography variant="caption" sx={{ color: '#666', mt: 1, display: 'block' }}>Sizes & Weights</Typography>
+                          {(variant.sizes || []).length > 0 && (
+                            <Grid container spacing={1} sx={{ mb: 0.5 }}>
+                              <Grid item xs={3}><Typography variant="caption" sx={{ color: '#999' }}>Size</Typography></Grid>
+                              <Grid item xs={3}><Typography variant="caption" sx={{ color: '#999' }}>Net Wt (g)</Typography></Grid>
+                              <Grid item xs={3}><Typography variant="caption" sx={{ color: '#999' }}>Gross Wt (g)</Typography></Grid>
+                              <Grid item xs={3} />
                             </Grid>
+                          )}
+                          {(variant.sizes || []).map((sz, sIdx) => (
+                            <Grid container spacing={1} key={`me-${mIdx}-pv-${vIdx}-sz-${sIdx}`} sx={{ mb: 0.5 }}>
+                              <Grid item xs={3}>
+                                <TextField size="small" fullWidth value={sz.size} placeholder="e.g., 14"
+                                  onChange={(e) => handleVariantSizeChange(mIdx, vIdx, sIdx, 'size', e.target.value)}
+                                />
+                              </Grid>
+                              <Grid item xs={3}>
+                                <TextField size="small" fullWidth type="number" value={sz.netWeight} placeholder="2.5"
+                                  onChange={(e) => handleVariantSizeChange(mIdx, vIdx, sIdx, 'netWeight', e.target.value)}
+                                />
+                              </Grid>
+                              <Grid item xs={3}>
+                                <TextField size="small" fullWidth type="number" value={sz.grossWeight} placeholder="2.8"
+                                  onChange={(e) => handleVariantSizeChange(mIdx, vIdx, sIdx, 'grossWeight', e.target.value)}
+                                />
+                              </Grid>
+                              <Grid item xs={3}>
+                                <IconButton size="small" onClick={() => handleRemoveVariantSize(mIdx, vIdx, sIdx)} sx={{ color: '#d32f2f' }}>
+                                  <Close sx={{ fontSize: 16 }} />
+                                </IconButton>
+                              </Grid>
+                            </Grid>
+                          ))}
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mt: 0.5 }}>
+                            <Button size="small" startIcon={<Add />} onClick={() => handleAddVariantSize(mIdx, vIdx)}
+                              sx={{ textTransform: 'none', color: '#1E1B4B' }}
+                            >
+                              Add Size
+                            </Button>
+                            {(variant.sizes || []).filter((s) => s.size).length > 0 && (
+                              <TextField select size="small" label="Default Size" sx={{ minWidth: 150 }}
+                                value={variant.defaultSize || ''}
+                                onChange={(e) => handlePurityVariantChange(mIdx, vIdx, 'defaultSize', e.target.value)}
+                              >
+                                {(variant.sizes || []).filter((s) => s.size).map((s) => (
+                                  <MenuItem key={`me-${mIdx}-pv-${vIdx}-ds-${s.size}`} value={s.size}>{s.size}</MenuItem>
+                                ))}
+                              </TextField>
+                            )}
                           </Box>
-                        )}
-                      </Box>
-                    )}
-                  </Box>
-                );
-              })}
+                        </Box>
+                      ))}
 
-              {formData.metalEntries.length < materials.length && (
-                <Button size="small" startIcon={<Add />} onClick={handleAddMetalEntry}
-                  sx={{ ...buttonSx, color: '#fff', mb: 2 }}
-                  variant="contained"
-                >
-                  Add Metal Type
-                </Button>
-              )}
+                      <Button size="small" startIcon={<Add />} onClick={() => handleAddPurityVariant(mIdx)}
+                        sx={{ textTransform: 'none', color: '#1E1B4B', mb: 2 }}
+                      >
+                        Add Purity Variant
+                      </Button>
 
-              {/* Fixed Metals */}
-              <Typography variant="body2" sx={{ color: '#666', mb: 1, mt: 1 }}>
-                Fixed Metals (always present, not selectable)
-              </Typography>
-              {formData.fixedMetals.map((fm, fIdx) => (
-                <Box key={`fm-${fIdx}`} sx={{ mb: 2, p: 1.5, border: '1px solid #e0e0e0', borderRadius: 1 }}>
-                  <Grid container spacing={1} alignItems="center">
-                    <Grid item xs={3}>
-                      <TextField select fullWidth size="small" label="Type" value={fm.type}
-                        onChange={(e) => handleFixedMetalChange(fIdx, 'type', e.target.value)}
-                        sx={{ minWidth: 100 }}
-                      >
-                        {materials.map((m) => <MenuItem key={`fm-${fIdx}-${m}`} value={m}>{m}</MenuItem>)}
-                      </TextField>
-                    </Grid>
-                    <Grid item xs={3}>
-                      <TextField select fullWidth size="small" label="Purity" value={fm.purity}
-                        onChange={(e) => handleFixedMetalChange(fIdx, 'purity', e.target.value)}
-                        disabled={!fm.type}
-                        sx={{ minWidth: 130 }}
-                      >
-                        {getPuritiesForMetal(fm.type).map((p) => (
-                          <MenuItem key={p} value={p}>{purityLabels[p] || p}</MenuItem>
-                        ))}
-                      </TextField>
-                    </Grid>
-                    <Grid item xs={2}>
-                      <TextField fullWidth size="small" label="Default Net Wt" type="number" value={fm.netWeight}
-                        onChange={(e) => handleFixedMetalChange(fIdx, 'netWeight', e.target.value)}
-                      />
-                    </Grid>
-                    <Grid item xs={2}>
-                      <TextField fullWidth size="small" label="Default Gross Wt" type="number" value={fm.grossWeight}
-                        onChange={(e) => handleFixedMetalChange(fIdx, 'grossWeight', e.target.value)}
-                      />
-                    </Grid>
-                    <Grid item xs={2}>
-                      <IconButton size="small" onClick={() => handleRemoveFixedMetal(fIdx)} sx={{ color: '#d32f2f', mt: 0.5 }}>
-                        <Close sx={{ fontSize: 16 }} />
-                      </IconButton>
-                    </Grid>
-                  </Grid>
-                  {getAvailableSizes().length > 0 && (
-                    <Box sx={{ mt: 1.5 }}>
-                      <Typography variant="caption" sx={{ color: '#666', fontWeight: 500 }}>
-                        Per-Size Weights
+                      {/* Per-Metal Pricing & Charges */}
+                      <Divider sx={{ my: 1.5, borderStyle: 'dashed' }} />
+                      <Typography variant="body2" sx={{ fontWeight: 'bold', color: '#1E1B4B', mb: 1 }}>
+                        Charges & Tax for {metalEntry.type}
                       </Typography>
-                      {getAvailableSizes().map((sz) => {
-                        const sizeRow = fm.sizes?.find((s) => s.size === sz) || {};
-                        return (
-                          <Grid container spacing={1} key={sz} sx={{ mt: 0.5 }} alignItems="center">
-                            <Grid item xs={2}>
-                              <Chip label={`Size ${sz}`} size="small" sx={{ fontSize: '0.7rem' }} />
-                            </Grid>
-                            <Grid item xs={4}>
-                              <TextField size="small" fullWidth label="Net Wt" type="number"
-                                value={sizeRow.netWeight || ''}
-                                onChange={(e) => handleFixedMetalSizeChange(fIdx, sz, 'netWeight', e.target.value)}
-                              />
-                            </Grid>
-                            <Grid item xs={4}>
-                              <TextField size="small" fullWidth label="Gross Wt" type="number"
-                                value={sizeRow.grossWeight || ''}
-                                onChange={(e) => handleFixedMetalSizeChange(fIdx, sz, 'grossWeight', e.target.value)}
-                              />
-                            </Grid>
+                      <Grid container spacing={2} sx={{ mb: 1 }}>
+                        <Grid item xs={6} sm={3}>
+                          <TextField fullWidth size="small" select label="Making Charge Type"
+                            value={metalEntry.makingChargeType || 'percentage'}
+                            onChange={(e) => handleMetalEntryPricingChange(mIdx, 'makingChargeType', e.target.value)}
+                          >
+                            <MenuItem value="percentage">Percentage (%)</MenuItem>
+                            <MenuItem value="flat_per_gram">Per Gram (₹)</MenuItem>
+                            <MenuItem value="fixed_amount">Fixed Amount (₹)</MenuItem>
+                          </TextField>
+                        </Grid>
+                        <Grid item xs={6} sm={2}>
+                          <TextField fullWidth size="small" type="number"
+                            label={metalEntry.makingChargeType === 'percentage' ? 'Making (%)' : 'Making (₹)'}
+                            value={metalEntry.makingChargeValue}
+                            onChange={(e) => handleMetalEntryPricingChange(mIdx, 'makingChargeValue', e.target.value)}
+                          />
+                        </Grid>
+                        <Grid item xs={6} sm={3}>
+                          <TextField fullWidth size="small" select label="Wastage Charge Type"
+                            value={metalEntry.wastageChargeType || 'percentage'}
+                            onChange={(e) => handleMetalEntryPricingChange(mIdx, 'wastageChargeType', e.target.value)}
+                          >
+                            <MenuItem value="percentage">Percentage (%)</MenuItem>
+                            <MenuItem value="fixed">Fixed Amount (₹)</MenuItem>
+                          </TextField>
+                        </Grid>
+                        <Grid item xs={6} sm={2}>
+                          <TextField fullWidth size="small" type="number"
+                            label={metalEntry.wastageChargeType === 'percentage' ? 'Wastage (%)' : 'Wastage (₹)'}
+                            value={metalEntry.wastageChargeValue}
+                            onChange={(e) => handleMetalEntryPricingChange(mIdx, 'wastageChargeValue', e.target.value)}
+                          />
+                        </Grid>
+                      </Grid>
+                      <Grid container spacing={2} sx={{ mb: 1 }}>
+                        <Grid item xs={6} sm={3}>
+                          <TextField fullWidth size="small" type="number" label="GST on Jewelry (%)"
+                            value={metalEntry.jewelryGst}
+                            onChange={(e) => handleMetalEntryPricingChange(mIdx, 'jewelryGst', e.target.value)}
+                            placeholder="Default: 3%"
+                          />
+                        </Grid>
+                        <Grid item xs={6} sm={3}>
+                          <TextField fullWidth size="small" type="number" label="GST on Making (%)"
+                            value={metalEntry.makingGst}
+                            onChange={(e) => handleMetalEntryPricingChange(mIdx, 'makingGst', e.target.value)}
+                            placeholder="Default: 5%"
+                          />
+                        </Grid>
+                      </Grid>
+
+                      {/* Per-Metal Price Preview */}
+                      {metalPreview && (
+                        <Box sx={{ mt: 1.5, p: 1.5, backgroundColor: '#F5F5F5', borderRadius: 1.5, border: '1px solid #E0E0E0' }}>
+                          <Typography variant="caption" sx={{ fontWeight: 'bold', color: '#1E1B4B', display: 'block', mb: 0.5 }}>
+                            Price Preview ({metalPreview.variantLabel})
+                          </Typography>
+                          <Grid container spacing={0.5} sx={{ display: 'flex', flexDirection: 'column' }}>
+                            {metalPreview.metalBreakdown.map((m, i) => (
+                              <React.Fragment key={i}>
+                                <Grid item xs={8}>
+                                  <Typography variant="caption" sx={{ color: '#666' }}>
+                                    {m.type} ({m.purity?.replace('_', ' ')}): {m.weight}g × ₹{m.rate.toLocaleString('en-IN')}/g
+                                  </Typography>
+                                </Grid>
+                                <Grid item xs={4} sx={{ textAlign: 'right' }}>
+                                  <Typography variant="caption">₹{m.value.toLocaleString('en-IN')}</Typography>
+                                </Grid>
+                              </React.Fragment>
+                            ))}
+                            {metalPreview.diamondValue > 0 && (
+                              <>
+                                <Grid item xs={8}><Typography variant="caption" sx={{ color: '#666' }}>Diamond Value</Typography></Grid>
+                                <Grid item xs={4} sx={{ textAlign: 'right' }}><Typography variant="caption">₹{metalPreview.diamondValue.toLocaleString('en-IN')}</Typography></Grid>
+                              </>
+                            )}
+                            <Grid item xs={8}><Typography variant="caption" sx={{ color: '#666' }}>Making ({metalPreview.mcType === 'percentage' ? `${metalPreview.mcValue}%` : `₹${metalPreview.mcValue}`})</Typography></Grid>
+                            <Grid item xs={4} sx={{ textAlign: 'right' }}><Typography variant="caption">₹{metalPreview.makingChargeAmount.toLocaleString('en-IN')}</Typography></Grid>
+                            {metalPreview.wastageChargeAmount > 0 && (
+                              <>
+                                <Grid item xs={8}><Typography variant="caption" sx={{ color: '#666' }}>Wastage ({metalPreview.wcType === 'percentage' ? `${metalPreview.wcValue}%` : `₹${metalPreview.wcValue}`})</Typography></Grid>
+                                <Grid item xs={4} sx={{ textAlign: 'right' }}><Typography variant="caption">₹{metalPreview.wastageChargeAmount.toLocaleString('en-IN')}</Typography></Grid>
+                              </>
+                            )}
+                            <Grid item xs={8}><Typography variant="caption" sx={{ color: '#666' }}>GST ({metalPreview.jewelryTaxRate}% + {metalPreview.makingTaxRate}%)</Typography></Grid>
+                            <Grid item xs={4} sx={{ textAlign: 'right' }}><Typography variant="caption">₹{metalPreview.totalTax.toLocaleString('en-IN')}</Typography></Grid>
+                            {metalPreview.discount > 0 && (
+                              <>
+                                <Grid item xs={8}><Typography variant="caption" sx={{ color: '#4CAF50' }}>Discount</Typography></Grid>
+                                <Grid item xs={4} sx={{ textAlign: 'right' }}><Typography variant="caption" sx={{ color: '#4CAF50' }}>-₹{metalPreview.discount.toLocaleString('en-IN')}</Typography></Grid>
+                              </>
+                            )}
+                            <Grid item xs={12}><Divider sx={{ my: 0.3 }} /></Grid>
+                            <Grid item xs={8}><Typography variant="caption" sx={{ fontWeight: 'bold', color: '#1E1B4B' }}>Final Price</Typography></Grid>
+                            <Grid item xs={4} sx={{ textAlign: 'right' }}><Typography variant="caption" sx={{ fontWeight: 'bold', color: '#1E1B4B' }}>₹{metalPreview.finalPrice.toLocaleString('en-IN')}</Typography></Grid>
                           </Grid>
-                        );
-                      })}
+                        </Box>
+                      )}
                     </Box>
                   )}
                 </Box>
-              ))}
-              <Button size="small" startIcon={<Add />} onClick={handleAddFixedMetal}
-                sx={{ textTransform: 'none', color: '#1E1B4B' }}
+              );
+            })}
+
+            {formData.metalEntries.length < materials.length && (
+              <Button size="small" startIcon={<Add />} onClick={handleAddMetalEntry}
+                sx={{ ...buttonSx, color: '#fff', mb: 2 }}
+                variant="contained"
               >
-                Add Fixed Metal
+                Add Metal Type
               </Button>
-            </Box>
+            )}
+
+            {/* Fixed Metals */}
+            <Typography variant="body2" sx={{ color: '#666', mb: 1, mt: 1 }}>
+              Fixed Metals (always present, not selectable)
+            </Typography>
+            {formData.fixedMetals.map((fm, fIdx) => (
+              <Box key={`fm-${fIdx}`} sx={{ mb: 2, p: 1.5, border: '1px solid #e0e0e0', borderRadius: 1 }}>
+                <Grid container spacing={1} alignItems="center">
+                  <Grid item xs={3}>
+                    <TextField select fullWidth size="small" label="Type" value={fm.type}
+                      onChange={(e) => handleFixedMetalChange(fIdx, 'type', e.target.value)}
+                      sx={{ minWidth: 100 }}
+                    >
+                      {materials.map((m) => <MenuItem key={`fm-${fIdx}-${m}`} value={m}>{m}</MenuItem>)}
+                    </TextField>
+                  </Grid>
+                  <Grid item xs={3}>
+                    <TextField select fullWidth size="small" label="Purity" value={fm.purity}
+                      onChange={(e) => handleFixedMetalChange(fIdx, 'purity', e.target.value)}
+                      disabled={!fm.type}
+                      sx={{ minWidth: 130 }}
+                    >
+                      {getPuritiesForMetal(fm.type).map((p) => (
+                        <MenuItem key={p} value={p}>{purityLabels[p] || p}</MenuItem>
+                      ))}
+                    </TextField>
+                  </Grid>
+                  <Grid item xs={2}>
+                    <TextField fullWidth size="small" label="Default Net Wt" type="number" value={fm.netWeight}
+                      onChange={(e) => handleFixedMetalChange(fIdx, 'netWeight', e.target.value)}
+                    />
+                  </Grid>
+                  <Grid item xs={2}>
+                    <TextField fullWidth size="small" label="Default Gross Wt" type="number" value={fm.grossWeight}
+                      onChange={(e) => handleFixedMetalChange(fIdx, 'grossWeight', e.target.value)}
+                    />
+                  </Grid>
+                  <Grid item xs={2}>
+                    <IconButton size="small" onClick={() => handleRemoveFixedMetal(fIdx)} sx={{ color: '#d32f2f', mt: 0.5 }}>
+                      <Close sx={{ fontSize: 16 }} />
+                    </IconButton>
+                  </Grid>
+                </Grid>
+                {getAvailableSizes().length > 0 && (
+                  <Box sx={{ mt: 1.5 }}>
+                    <Typography variant="caption" sx={{ color: '#666', fontWeight: 500 }}>
+                      Per-Size Weights
+                    </Typography>
+                    {getAvailableSizes().map((sz) => {
+                      const sizeRow = fm.sizes?.find((s) => s.size === sz) || {};
+                      return (
+                        <Grid container spacing={1} key={sz} sx={{ mt: 0.5 }} alignItems="center">
+                          <Grid item xs={2}>
+                            <Chip label={`Size ${sz}`} size="small" sx={{ fontSize: '0.7rem' }} />
+                          </Grid>
+                          <Grid item xs={4}>
+                            <TextField size="small" fullWidth label="Net Wt" type="number"
+                              value={sizeRow.netWeight || ''}
+                              onChange={(e) => handleFixedMetalSizeChange(fIdx, sz, 'netWeight', e.target.value)}
+                            />
+                          </Grid>
+                          <Grid item xs={4}>
+                            <TextField size="small" fullWidth label="Gross Wt" type="number"
+                              value={sizeRow.grossWeight || ''}
+                              onChange={(e) => handleFixedMetalSizeChange(fIdx, sz, 'grossWeight', e.target.value)}
+                            />
+                          </Grid>
+                        </Grid>
+                      );
+                    })}
+                  </Box>
+                )}
+              </Box>
+            ))}
+            <Button size="small" startIcon={<Add />} onClick={handleAddFixedMetal}
+              sx={{ textTransform: 'none', color: '#1E1B4B' }}
+            >
+              Add Fixed Metal
+            </Button>
+          </Box>
 
           <Divider sx={{ mb: 3 }} />
 
@@ -1816,18 +1922,20 @@ export default function ProductsPage() {
               </Button>
 
               {/* Diamond Totals */}
-              {(() => { const { totalCount, totalWeight } = getDiamondTotals(); return (
-                totalCount > 0 || totalWeight > 0 ? (
-                  <Box sx={{ display: 'flex', gap: 3, mb: 2, px: 1 }}>
-                    <Typography variant="body2" sx={{ color: '#333' }}>
-                      <strong>Total Diamonds:</strong> {totalCount}
-                    </Typography>
-                    <Typography variant="body2" sx={{ color: '#333' }}>
-                      <strong>Total Weight:</strong> {totalWeight} ct
-                    </Typography>
-                  </Box>
-                ) : null
-              ); })()}
+              {(() => {
+                const { totalCount, totalWeight } = getDiamondTotals(); return (
+                  totalCount > 0 || totalWeight > 0 ? (
+                    <Box sx={{ display: 'flex', gap: 3, mb: 2, px: 1 }}>
+                      <Typography variant="body2" sx={{ color: '#333' }}>
+                        <strong>Total Diamonds:</strong> {totalCount}
+                      </Typography>
+                      <Typography variant="body2" sx={{ color: '#333' }}>
+                        <strong>Total Weight:</strong> {totalWeight} ct
+                      </Typography>
+                    </Box>
+                  ) : null
+                );
+              })()}
 
               <Divider sx={{ my: 1.5, borderStyle: 'dashed' }} />
 
@@ -1871,8 +1979,10 @@ export default function ProductsPage() {
                 />
                 <IconButton size="small"
                   onClick={() => removeExistingImage(index)}
-                  sx={{ position: 'absolute', top: -8, right: -8, backgroundColor: '#d32f2f', color: 'white', width: 22, height: 22,
-                    '&:hover': { backgroundColor: '#b71c1c' } }}
+                  sx={{
+                    position: 'absolute', top: -8, right: -8, backgroundColor: '#d32f2f', color: 'white', width: 22, height: 22,
+                    '&:hover': { backgroundColor: '#b71c1c' }
+                  }}
                 >
                   <Close sx={{ fontSize: 14 }} />
                 </IconButton>
@@ -1887,8 +1997,10 @@ export default function ProductsPage() {
                 />
                 <IconButton size="small"
                   onClick={() => removeNewImage(index)}
-                  sx={{ position: 'absolute', top: -8, right: -8, backgroundColor: '#d32f2f', color: 'white', width: 22, height: 22,
-                    '&:hover': { backgroundColor: '#b71c1c' } }}
+                  sx={{
+                    position: 'absolute', top: -8, right: -8, backgroundColor: '#d32f2f', color: 'white', width: 22, height: 22,
+                    '&:hover': { backgroundColor: '#b71c1c' }
+                  }}
                 >
                   <Close sx={{ fontSize: 14 }} />
                 </IconButton>
@@ -2026,6 +2138,23 @@ export default function ProductsPage() {
                 <MenuItem value="coming_soon">Coming Soon</MenuItem>
               </TextField>
             </Grid>
+
+            <Grid item xs={12} sm={6}>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                <FormControlLabel
+                  control={<Switch checked={formData.featured} onChange={(e) => setFormData({ ...formData, featured: e.target.checked })} />}
+                  label="Featured (DP Signature)"
+                />
+                <FormControlLabel
+                  control={<Switch checked={formData.bestseller} onChange={(e) => setFormData({ ...formData, bestseller: e.target.checked })} />}
+                  label="Bestseller"
+                />
+                <FormControlLabel
+                  control={<Switch checked={formData.newArrival} onChange={(e) => setFormData({ ...formData, newArrival: e.target.checked })} />}
+                  label="New Arrival"
+                />
+              </Box>
+            </Grid>
           </Grid>
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>
@@ -2037,6 +2166,6 @@ export default function ProductsPage() {
           </Button>
         </DialogActions>
       </Dialog>
-    </div>
+    </div >
   );
 }

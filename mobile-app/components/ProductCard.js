@@ -104,13 +104,18 @@ const ProductCard = ({
                         color={isFavorite ? Colors.redColor : Colors.grayColor}
                     />
                 </TouchableOpacity>
-            </View>
+                {item.newArrival && (
+                    <View style={styles.newBadge}>
+                        <Text style={styles.newBadgeText}>NEW</Text>
+                    </View>
+                )}
+            </View >
 
             {/* Divider */}
-            <View style={styles.divider} />
+            < View style={styles.divider} />
 
             {/* Product Info */}
-            <View style={styles.infoContainer}>
+            < View style={styles.infoContainer} >
                 <Text numberOfLines={1} style={styles.productName}>
                     {item.name}
                 </Text>
@@ -132,13 +137,15 @@ const ProductCard = ({
                         />
                     </TouchableOpacity>
                 </View>
-                {item.category && (
-                    <Text numberOfLines={1} style={styles.categoryText}>
-                        {item.category}
-                    </Text>
-                )}
-            </View>
-        </TouchableOpacity>
+                {
+                    item.category && (
+                        <Text numberOfLines={1} style={styles.categoryText}>
+                            {item.category}
+                        </Text>
+                    )
+                }
+            </View >
+        </TouchableOpacity >
     );
 };
 
@@ -229,5 +236,20 @@ const styles = StyleSheet.create({
     categoryText: {
         ...Fonts.grayColor14Regular,
         marginTop: 2,
+    },
+    newBadge: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        backgroundColor: Colors.primaryColor,
+        borderBottomRightRadius: Sizes.fixPadding,
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        zIndex: 10,
+    },
+    newBadgeText: {
+        ...Fonts.whiteColor12Medium,
+        fontSize: 10,
+        letterSpacing: 0.5,
     },
 });

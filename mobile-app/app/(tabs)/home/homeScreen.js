@@ -24,7 +24,80 @@ const categoryImageMap = {
     Nosering: require('../../../assets/images/nosering.jpg'),
 };
 
-const HOME_CACHE_KEY = 'home_cache_v1';
+const HOME_CACHE_KEY = 'home_cache_v2';
+
+const SignatureHeader = ({ title, subtitle, onPress }) => {
+    return (
+        <View style={{ width: '100%', paddingHorizontal: Sizes.fixPadding, alignItems: 'center', marginBottom: Sizes.fixPadding, marginTop: Sizes.fixPadding }}>
+            <Text style={{ ...Fonts.blackColor18SemiBold, fontSize: 19.0, letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 2.0, textAlign: 'center' }}>
+                {title}
+            </Text>
+            {subtitle && (
+                <Text numberOfLines={1} adjustsFontSizeToFit style={{ ...Fonts.blackColor14Medium, fontSize: 12.0, lineHeight: 18.0, textAlign: 'center', fontStyle: 'italic', letterSpacing: 0.2, marginBottom: 5.0, width: '90%' }}>
+                    {subtitle}
+                </Text>
+            )}
+            {onPress && (
+                <TouchableOpacity
+                    activeOpacity={0.7}
+                    onPress={onPress}
+                    style={{
+                        marginTop: 5.0,
+                        paddingVertical: 6.0,
+                        paddingHorizontal: 15.0,
+                        borderWidth: 1.0,
+                        borderColor: '#D4AF37', // Gold
+                        borderRadius: 20.0,
+                    }}
+                >
+                    <Text style={{ ...Fonts.blackColor14Medium, fontSize: 11.0, letterSpacing: 1.0, textTransform: 'uppercase', color: '#D4AF37' }}>
+                        Explore The Collection
+                    </Text>
+                </TouchableOpacity>
+            )}
+            <View style={{ flexDirection: 'row', alignItems: 'center', width: '75%', marginTop: 10.0 }}>
+                <View style={{ flex: 1, height: 1.5, backgroundColor: '#E0E0E0' }} />
+                <Image
+                    source={require('../../../assets/images/icon.png')}
+                    style={{ width: 35.0, height: 35.0, resizeMode: 'contain', marginHorizontal: Sizes.fixPadding - 5.0 }}
+                />
+                <View style={{ flex: 1, height: 1.5, backgroundColor: '#E0E0E0' }} />
+            </View>
+        </View>
+    );
+};
+
+const StandardSectionHeader = ({ title, onPress }) => {
+    return (
+        <View style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            marginHorizontal: Sizes.fixPadding,
+            marginTop: Sizes.fixPadding * 2.0,
+            marginBottom: Sizes.fixPadding,
+            justifyContent: 'space-between'
+        }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <View style={{ width: 4, height: 24, backgroundColor: '#D4AF37', marginRight: 10, borderRadius: 2 }} />
+                <Text style={{
+                    ...Fonts.blackColor18SemiBold,
+                    fontSize: 18.0,
+                    letterSpacing: 0.5,
+                }}>
+                    {title}
+                </Text>
+            </View>
+            {onPress && (
+                <TouchableOpacity activeOpacity={0.7} onPress={onPress} style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <Text style={{ ...Fonts.primaryColor14Medium, fontSize: 13.0 }}>
+                        See All Trends
+                    </Text>
+                    <Feather name="chevron-right" size={18} color={Colors.primaryColor} />
+                </TouchableOpacity>
+            )}
+        </View>
+    );
+};
 
 const HomeScreen = () => {
 
@@ -227,11 +300,11 @@ const HomeScreen = () => {
                     <FlatList
                         ListHeaderComponent={
                             <>
+                                {searchBar()}
                                 {banners()}
                                 {categoryInfo()}
                                 {signatureInfo()}
                                 {recommendedForYouInfo()}
-                                {customCollections.map((col) => customCollectionSection(col))}
                                 {popularInfo()}
                             </>
                         }
@@ -264,9 +337,10 @@ const HomeScreen = () => {
         const productsWithFavorites = addFavoriteStatus(popular);
         return (
             <View style={{ marginTop: Sizes.fixPadding, marginHorizontal: Sizes.fixPadding }}>
-                <Text style={{ marginHorizontal: Sizes.fixPadding, ...Fonts.blackColor18SemiBold, marginBottom: Sizes.fixPadding + 3.0 }}>
-                    Popular
-                </Text>
+                <StandardSectionHeader
+                    title="Bestsellers"
+                    onPress={() => navigation.push('categoryWiseProducts/categoryWiseProductsScreen', { bestseller: 'true' })}
+                />
                 <FlatList
                     data={productsWithFavorites}
                     keyExtractor={(item) => `${item.productId}`}
@@ -301,22 +375,11 @@ const HomeScreen = () => {
         const productsWithFavorites = addFavoriteStatus(featured);
         return (
             <View style={{ marginTop: Sizes.fixPadding, marginBottom: Sizes.fixPadding / 2.0 }}>
-                <View style={{ width: '100%', paddingHorizontal: Sizes.fixPadding, alignItems: 'center', marginBottom: Sizes.fixPadding }}>
-                    <Text style={{ ...Fonts.blackColor18SemiBold, fontSize: 19.0, letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 2.0, textAlign: 'center' }}>
-                        DP SIGNATURE
-                    </Text>
-                    <Text numberOfLines={1} adjustsFontSizeToFit style={{ ...Fonts.blackColor14Medium, fontSize: 12.0, lineHeight: 18.0, textAlign: 'center', fontStyle: 'italic', letterSpacing: 0.2, marginBottom: 5.0, width: '90%' }}>
-                        Handpicked designs for your unique glow
-                    </Text>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', width: '75%', marginTop: 2.0 }}>
-                        <View style={{ flex: 1, height: 1.5, backgroundColor: '#9E9E9E' }} />
-                        <Image
-                            source={require('../../../assets/images/icon.png')}
-                            style={{ width: 35.0, height: 35.0, resizeMode: 'contain', marginHorizontal: Sizes.fixPadding - 5.0 }}
-                        />
-                        <View style={{ flex: 1, height: 1.5, backgroundColor: '#9E9E9E' }} />
-                    </View>
-                </View>
+                <SignatureHeader
+                    title="DP SIGNATURE"
+                    subtitle="Handpicked designs for your unique glow"
+                    onPress={() => navigation.push('categoryWiseProducts/categoryWiseProductsScreen', { featured: 'true' })}
+                />
                 <FlatList
                     data={productsWithFavorites}
                     keyExtractor={(item) => `${item.productId}`}
@@ -378,12 +441,7 @@ const HomeScreen = () => {
         const productsWithFavorites = addFavoriteStatus(dataSource);
         return (
             <View style={{ marginTop: Sizes.fixPadding, marginBottom: Sizes.fixPadding / 2.0 }}>
-                <View style={{ paddingHorizontal: Sizes.fixPadding, marginBottom: Sizes.fixPadding }}>
-                    <Text style={{ ...Fonts.blackColor18SemiBold, marginBottom: 2.0 }}>
-                        Recommended For You
-                    </Text>
-
-                </View>
+                <StandardSectionHeader title="Recommended For You" />
                 <FlatList
                     data={productsWithFavorites}
                     keyExtractor={(item) => `${item.productId}`}
@@ -541,8 +599,20 @@ const HomeScreen = () => {
                 >
                     <Text style={styles.headerPriceText}>View Price</Text>
                 </TouchableOpacity>
-                <Feather name="search" size={22} color={Colors.blackColor} onPress={() => { navigation.navigate('search/searchScreen') }} />
             </View>
+        )
+    }
+
+    function searchBar() {
+        return (
+            <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={() => navigation.navigate('search/searchScreen')}
+                style={styles.searchBarContainer}
+            >
+                <Feather name="search" size={20} color="#888" />
+                <Text style={styles.searchBarText}>Discover your perfect jewellery ✨</Text>
+            </TouchableOpacity>
         )
     }
 }
@@ -562,6 +632,26 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         borderBottomColor: Colors.offWhiteColor,
         borderBottomWidth: 1.0
+    },
+    searchBarContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginHorizontal: Sizes.fixPadding * 2.0,
+        marginTop: Sizes.fixPadding,
+        marginBottom: Sizes.fixPadding * 1.5,
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        borderRadius: 30,
+        borderWidth: 1.2,
+        borderColor: '#E0E0E0',
+        backgroundColor: 'transparent',
+    },
+    searchBarText: {
+        ...Fonts.grayColor15Regular,
+        marginLeft: 10,
+        fontSize: 14,
+        color: '#999',
+        letterSpacing: 0.3,
     },
     headerPriceBtn: {
         paddingVertical: 4,

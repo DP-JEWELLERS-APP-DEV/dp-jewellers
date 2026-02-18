@@ -352,25 +352,28 @@ const ProductDetailScreen = () => {
         }));
         const finalImages = imageList.length ? imageList : [{ image: fallbackImage }];
         const isRemote = imageList.length > 0;
+        const cardWidth = Screen.width - 32;
+        const cardHeight = Screen.height * 0.52;
         return (
-            <View style={{ height: Screen.height / 2.8 }}>
-                <FlatList
-                    data={finalImages}
-                    keyExtractor={(_, index) => `${index}`}
-                    horizontal
-                    pagingEnabled
-                    showsHorizontalScrollIndicator={false}
-                    onViewableItemsChanged={onViewRef.current}
-                    viewabilityConfig={viewConfigRef.current}
-                    renderItem={({ item }) => (
-                        <View style={{ width: Screen.width }}>
+            <View style={{ alignItems: 'center', paddingTop: 8 }}>
+                <View style={[styles.imageCardContainer, { width: cardWidth, height: cardHeight }]}>
+                    <FlatList
+                        data={finalImages}
+                        keyExtractor={(_, index) => `${index}`}
+                        horizontal
+                        pagingEnabled
+                        showsHorizontalScrollIndicator={false}
+                        onViewableItemsChanged={onViewRef.current}
+                        viewabilityConfig={viewConfigRef.current}
+                        renderItem={({ item }) => (
                             <Image
                                 source={isRemote ? { uri: item.image } : item.image}
-                                style={styles.productImageStyle}
+                                style={{ width: cardWidth, height: cardHeight, borderTopLeftRadius: 50, borderTopRightRadius: 8, borderBottomLeftRadius: 8, borderBottomRightRadius: 50 }}
+                                resizeMode="cover"
                             />
-                        </View>
-                    )}
-                />
+                        )}
+                    />
+                </View>
                 <View style={styles.dotsWrap}>
                     {finalImages.map((_, idx) => (
                         <View
@@ -982,30 +985,40 @@ const styles = StyleSheet.create({
         borderBottomColor: Colors.offWhiteColor,
         borderBottomWidth: 1.0,
     },
+    imageCardContainer: {
+        borderTopLeftRadius: 50,
+        borderTopRightRadius: 8,
+        borderBottomLeftRadius: 8,
+        borderBottomRightRadius: 50,
+        overflow: 'hidden',
+        elevation: 4,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.12,
+        shadowRadius: 10,
+    },
     dotsWrap: {
-        position: 'absolute',
-        bottom: Sizes.fixPadding,
-        width: '100%',
         flexDirection: 'row',
         justifyContent: 'center',
+        marginTop: 14,
+        marginBottom: 6,
     },
     dotStyle: {
-        marginHorizontal: 4,
-        width: 8,
-        height: 8,
-        borderRadius: 4,
+        marginHorizontal: 5,
+        width: 10,
+        height: 10,
+        borderRadius: 5,
     },
     dotActive: {
-        backgroundColor: Colors.primaryColor,
+        backgroundColor: '#222',
     },
     dotInactive: {
-        backgroundColor: Colors.lightGrayColor,
+        backgroundColor: '#ccc',
     },
     productImageStyle: {
-        width: Screen.width / 1.5,
-        height: Screen.height / 3.5,
-        resizeMode: 'contain',
-        alignSelf: 'center',
+        width: '100%',
+        height: '100%',
+        resizeMode: 'cover',
     },
     productSizeBoxStyle: {
         borderColor: Colors.offWhiteColor,

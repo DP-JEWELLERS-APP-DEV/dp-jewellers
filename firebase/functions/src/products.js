@@ -432,61 +432,82 @@ exports.listProducts = onCall({ region: "asia-south1" }, async (request) => {
     startAfterDoc,
   } = request.data || {};
 
-  // If includeAll is true and caller is admin, show all products including archived
-  let showAll = false;
-  if (includeAll && request.auth) {
-    const adminDoc = await db.collection("admins").doc(request.auth.uid).get();
-    if (adminDoc.exists && adminDoc.data().isActive) {
-      showAll = true;
+  console.log("DEBUG listProducts called with:", JSON.stringify(request.data));
+
+  try {
+    let showAll = false;
+    if (includeAll && request.auth) {
+      const adminDoc = await db.collection("admins").doc(request.auth.uid).get();
+      if (adminDoc.exists && adminDoc.data().isActive) {
+        showAll = true;
+      }
     }
-  }
 
-  let query = showAll
-    ? db.collection(PRODUCTS)
-    : db.collection(PRODUCTS).where("isActive", "==", true);
+    let query = showAll
+      ? db.collection(PRODUCTS)
+      : db.collection(PRODUCTS).where("isActive", "==", true);
 
-  if (category) query = query.where("category", "==", category);
-  if (subCategory) query = query.where("subCategory", "==", subCategory);
-  if (featured) query = query.where("featured", "==", true);
-  if (bestseller) query = query.where("bestseller", "==", true);
-  if (newArrival) query = query.where("newArrival", "==", true);
-  if (collection) query = query.where("collections", "array-contains", collection);
-  if (tag) query = query.where("tags", "array-contains", tag);
+    if (category) query = query.where("category", "==", category);
+    if (subCategory) query = query.where("subCategory", "==", subCategory);
+    if (featured) query = query.where("featured", "==", true);
+    if (bestseller) query = query.where("bestseller", "==", true);
+    if (newArrival) query = query.where("newArrival", "==", true);
+    if (collection) query = query.where("collections", "array-contains", collection);
+    if (tag) query = query.where("tags", "array-contains", tag);
 
-  // Sort
-  const validSortFields = ["createdAt", "pricing.finalPrice", "displayOrder", "purchaseCount"];
-  const field = validSortFields.includes(sortBy) ? sortBy : "createdAt";
-  query = query.orderBy(field, sortOrder === "asc" ? "asc" : "desc");
+    // Sort (InMemory to avoid complex index requirements)
+    // const validSortFields = ["createdAt", "pricing.finalPrice", "displayOrder", "purchaseCount"];
+    // const field = validSortFields.includes(sortBy) ? sortBy : "createdAt";
+    // query = query.orderBy(field, sortOrder === "asc" ? "asc" : "desc");
 
-  // Pagination
-  if (startAfterDoc) {
-    const lastDoc = await db.collection(PRODUCTS).doc(startAfterDoc).get();
-    if (lastDoc.exists) {
-      query = query.startAfter(lastDoc);
+    // Pagination
+    if (startAfterDoc) {
+      const lastDoc = await db.collection(PRODUCTS).doc(startAfterDoc).get();
+      if (lastDoc.exists) {
+        query = query.startAfter(lastDoc);
+      }
     }
+
+    query = query.limit(Math.min(limit, 50));
+
+    const snapshot = await query.get();
+    const products = snapshot.docs.map((doc) => ({
+      productId: doc.id,
+      ...doc.data(),
+    }));
+
+    let filtered = products;
+    if (minPrice) {
+      filtered = filtered.filter((p) => (p.pricing?.finalPrice || 0) >= minPrice);
+    }
+    if (maxPrice) {
+      filtered = filtered.filter((p) => (p.pricing?.finalPrice || 0) <= maxPrice);
+    }
+
+    // Perform In-Memory Sort
+    const validSortFields = ["createdAt", "pricing.finalPrice", "displayOrder", "purchaseCount"];
+    const field = validSortFields.includes(sortBy) ? sortBy : "createdAt";
+    filtered.sort((a, b) => {
+      let valA = field.includes('.') ? field.split('.').reduce((o, i) => o[i], a) : a[field];
+      let valB = field.includes('.') ? field.split('.').reduce((o, i) => o[i], b) : b[field];
+
+      // Handle dates
+      if (valA && valA.toDate) valA = valA.toDate();
+      if (valB && valB.toDate) valB = valB.toDate();
+
+      if (valA < valB) return sortOrder === 'asc' ? -1 : 1;
+      if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
+      return 0;
+    });
+
+    return {
+      products: filtered,
+      count: filtered.length,
+      lastDoc: snapshot.docs.length > 0 ? snapshot.docs[snapshot.docs.length - 1].id : null,
+    };
+  } catch (err) {
+    console.error("listProducts failed", err);
+    throw new HttpsError("unknown", `DEBUG: ${err.message}`);
   }
-
-  query = query.limit(Math.min(limit, 50));
-
-  const snapshot = await query.get();
-  const products = snapshot.docs.map((doc) => ({
-    productId: doc.id,
-    ...doc.data(),
-  }));
-
-  // Client-side price filtering (Firestore doesn't support range on calculated fields easily)
-  let filtered = products;
-  if (minPrice) {
-    filtered = filtered.filter((p) => (p.pricing?.finalPrice || 0) >= minPrice);
-  }
-  if (maxPrice) {
-    filtered = filtered.filter((p) => (p.pricing?.finalPrice || 0) <= maxPrice);
-  }
-
-  return {
-    products: filtered,
-    count: filtered.length,
-    lastDoc: snapshot.docs.length > 0 ? snapshot.docs[snapshot.docs.length - 1].id : null,
-  };
 });
 

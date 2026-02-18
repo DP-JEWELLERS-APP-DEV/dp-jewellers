@@ -13,6 +13,7 @@ function normalizeSearchTerm(term) {
 
 function mapProductDoc(doc) {
   const data = doc.data();
+
   return {
     productId: doc.id,
     name: data.name,
@@ -23,6 +24,8 @@ function mapProductDoc(doc) {
     metalType: data.configurator?.defaultMetalType || "",
     purchaseCount: data.purchaseCount || 0,
     isActive: data.isActive !== false,
+    bestseller: data.bestseller || false,
+    newArrival: data.newArrival === true, // Only use admin-set flag
   };
 }
 
@@ -740,7 +743,7 @@ exports.getHomePageData = onCall({ region: "asia-south1" }, async (_request) => 
   try {
     const popularSnapshot = await db.collection(PRODUCTS)
       .where("isActive", "==", true)
-      .orderBy("createdAt", "desc")
+      .where("bestseller", "==", true)
       .limit(8)
       .get();
 
@@ -793,11 +796,24 @@ exports.getHomePageData = onCall({ region: "asia-south1" }, async (_request) => 
 
   let customCollections = [];
   try {
+    // 1. Get IDs of collections linked from active banners
+    const bannerLinkedCollectionIds = new Set();
+    banners.forEach(b => {
+      if (b.linkType === 'custom_collection' && b.linkTarget) {
+        bannerLinkedCollectionIds.add(b.linkTarget);
+      }
+    });
+
     const collectionsSnapshot = await db.collection("customCollections")
       .where("isActive", "==", true)
       .get();
 
     for (const collectionDoc of collectionsSnapshot.docs) {
+      // 2. Only process if collection is linked to a banner
+      if (!bannerLinkedCollectionIds.has(collectionDoc.id)) {
+        continue;
+      }
+
       const data = collectionDoc.data();
       const productIds = (data.productIds || []).slice(0, 6);
       if (productIds.length === 0) continue;
@@ -828,6 +844,11 @@ exports.getHomePageData = onCall({ region: "asia-south1" }, async (_request) => 
         customCollections.push({ id: collectionDoc.id, name: data.name, products, createdAt });
       }
     }
+    // Sort by banner order if possible, or fallback to creation/display order. 
+    // Since we don't have banner display order mapped here easily without complex logic, 
+    // sticking to createdAt or we could sort based on the banner order.
+    // For now, sorting by createdAt is fine, or we could sort to match banner order.
+    // Let's stick to existing sort for now.
     customCollections.sort((a, b) => b.createdAt - a.createdAt);
     customCollections = customCollections.map(({ createdAt: _c, ...rest }) => rest);
   } catch (err) {

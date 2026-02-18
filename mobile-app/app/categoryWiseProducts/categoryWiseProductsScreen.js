@@ -14,7 +14,7 @@ const CategoryWiseProductsScreen = () => {
     const navigation = useNavigation();
     const router = useRouter();
     const params = useLocalSearchParams();
-    const categoryName = params?.category ? String(params.category) : 'Rings';
+    const categoryName = params?.category ? String(params.category) : undefined;
     const collectionId = params?.collectionId ? String(params.collectionId) : null;
     const collectionName = params?.collectionName ? String(params.collectionName) : null;
 
@@ -58,9 +58,12 @@ const CategoryWiseProductsScreen = () => {
                     const res = await getCustomCollectionProducts({ collectionId });
                     products = res?.data?.products || [];
                 } else {
-                    const getProductsByCategory = httpsCallable(functions, 'getProductsByCategory');
-                    const res = await getProductsByCategory({
-                        category: categoryName,
+
+                    const listProducts = httpsCallable(functions, 'listProducts');
+                    const res = await listProducts({
+                        category: categoryName !== 'undefined' ? categoryName : undefined,
+                        featured: params.featured === 'true',
+                        bestseller: params.bestseller === 'true',
                         material: filters.material || undefined,
                         purity: filters.purity || undefined,
                         goldColor: filters.goldColor || undefined,
@@ -68,14 +71,27 @@ const CategoryWiseProductsScreen = () => {
                         minPrice: filters.minPrice ? Number(filters.minPrice) : undefined,
                         maxPrice: filters.maxPrice ? Number(filters.maxPrice) : undefined,
                     });
-                    products = res?.data?.products || [];
+                    products = (res?.data?.products || []).map(p => ({
+                        productId: p.productId,
+                        name: p.name,
+                        category: p.category,
+                        image: p.images?.[0]?.url || '',
+                        finalPrice: p.priceRange?.defaultPrice || p.pricing?.finalPrice || 0,
+                        priceRange: p.priceRange || null,
+                        metalType: p.configurator?.defaultMetalType || '',
+                        purchaseCount: p.purchaseCount || 0,
+                        isActive: p.isActive !== false,
+                        bestseller: p.bestseller || false,
+                        newArrival: p.newArrival || false,
+                    }));
                 }
                 if (active) {
                     setitems(products);
                 }
             } catch (err) {
                 if (active) {
-                    seterrorText('Failed to load products.');
+                    console.error("Fetch Error: ", err);
+                    seterrorText(`Failed to load products: ${err.message}`);
                     setitems([]);
                 }
             } finally {
@@ -164,7 +180,7 @@ const CategoryWiseProductsScreen = () => {
                 />
                 {collectionId ? (
                     <Text numberOfLines={1} style={[styles.headerTitle, { textAlign: 'center' }]}>
-                        {collectionName || 'Collection'}
+                        {collectionName || categoryName || (params.featured === 'true' ? 'DP Signature' : params.bestseller === 'true' ? 'Bestsellers' : 'Products')}
                     </Text>
                 ) : (
                     <TouchableOpacity onPress={() => router.replace('/(tabs)/home/homeScreen')} activeOpacity={0.7} style={{ flex: 1, alignItems: 'center' }}>
