@@ -116,19 +116,28 @@ export default function PrivacyPolicy() {
                     <Typography paragraph>
                         <strong>Payments:</strong> All payments are processed securely through Razorpay. We do not store your card details or banking information on our servers.
                     </Typography>
-                    <Typography paragraph>
-                        <strong>Refunds & Cancellations:</strong>
+                    <Box mt={2}>
+                        <Typography variant="subtitle1" gutterBottom><strong>Refunds & Cancellations:</strong></Typography>
                         <ul>
                             <li><strong>Cancellations:</strong> You can cancel your order before it has been shipped. Once shipped, orders cannot be cancelled.</li>
                             <li><strong>Returns:</strong> We accept returns for damaged or incorrect items reported within 24 hours of delivery. Please record an unboxing video as proof.</li>
                             <li><strong>Refunds:</strong> Approved refunds will be processed within 5-7 business days to the original payment method.</li>
                         </ul>
+                    </Box>
+                </Box>
+
+                <Box sx={{ mb: 3 }}>
+                    <Typography variant="h5" gutterBottom sx={{ fontWeight: 'bold' }}>
+                        7. Account Deletion
+                    </Typography>
+                    <Typography paragraph>
+                        You have the right to request the deletion of your account and associated data. To do so, please contact us at <strong>thedizilight@gmail.com</strong> with the subject line "Account Deletion Request". We will process your request within 30 days.
                     </Typography>
                 </Box>
 
                 <Box sx={{ mb: 3 }}>
                     <Typography variant="h5" gutterBottom sx={{ fontWeight: 'bold' }}>
-                        7. Contact Us
+                        8. Contact Us
                     </Typography>
                     <Typography paragraph>
                         If you have any questions about this privacy policy, payment terms, or our practices, please contact us at:
