@@ -21,9 +21,12 @@ import {
   Tooltip,
   Autocomplete,
   InputAdornment,
+  ToggleButtonGroup,
+  ToggleButton,
 } from '@mui/material';
-import { DataGrid, GridToolbar } from '@mui/x-data-grid';
-import { Edit, Delete, Add, Close, Collections as CollectionsIcon, Search } from '@mui/icons-material';
+import { ViewList, GridView, Edit, Delete, Add, Close, Collections as CollectionsIcon, Search } from '@mui/icons-material';
+import CollectionListView from '@/components/collections/CollectionListView';
+import CollectionGridView from '@/components/collections/CollectionGridView';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import app from '@/lib/firebase';
 
@@ -49,6 +52,9 @@ export default function CollectionsPage() {
   const [openDialog, setOpenDialog] = useState(false);
   const [editingCollectionId, setEditingCollectionId] = useState(null);
   const [formData, setFormData] = useState({ ...emptyForm });
+  
+  const [viewMode, setViewMode] = useState('list');
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Product picker state
   const [allProducts, setAllProducts] = useState([]);
@@ -213,111 +219,78 @@ export default function CollectionsPage() {
     );
   });
 
-  const columns = [
-    {
-      field: 'name',
-      headerName: 'Collection Name',
-      flex: 1,
-      minWidth: 180,
-      sortable: true,
-    },
-    {
-      field: 'productIds',
-      headerName: 'Products',
-      width: 120,
-      sortable: false,
-      renderCell: (params) => (
-        <Chip
-          label={`${(params.row.productIds || []).length} products`}
-          size="small"
-          sx={{ backgroundColor: '#E8EAF6', color: '#1E1B4B' }}
-        />
-      ),
-    },
-    {
-      field: 'isActive',
-      headerName: 'Status',
-      width: 100,
-      sortable: true,
-      renderCell: (params) => (
-        <Chip
-          label={params.row.isActive !== false ? 'Active' : 'Inactive'}
-          color={params.row.isActive !== false ? 'success' : 'default'}
-          size="small"
-        />
-      ),
-    },
-    {
-      field: 'actions',
-      headerName: 'Actions',
-      width: 120,
-      sortable: false,
-      filterable: false,
-      renderCell: (params) => (
-        <>
-          <Tooltip title="Edit collection" arrow>
-            <IconButton size="small" onClick={() => handleOpenDialog(params.row)} sx={{ color: '#1E1B4B', mr: 0.5 }}>
-              <Edit fontSize="small" />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="Delete collection" arrow>
-            <IconButton size="small" onClick={() => handleDelete(params.row.id)} sx={{ color: '#d32f2f' }}>
-              <Delete fontSize="small" />
-            </IconButton>
-          </Tooltip>
-        </>
-      ),
-    },
-  ];
+  const filteredCollections = collections.filter(c => {
+    if (!searchQuery) return true;
+    return (c.name || '').toLowerCase().includes(searchQuery.toLowerCase());
+  });
 
   return (
-    <div>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h4" className="font-bold" sx={{ color: '#1E1B4B' }}>
-          Custom Collections
-        </Typography>
+    <div style={{ background: '#FAFAF8', minHeight: '100%', paddingBottom: 40 }}>
+      {/* ── Page Header ── */}
+      <div style={{ marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div>
+          <Typography variant="h4" sx={{ color: '#1E1B4B', fontWeight: 700, letterSpacing: -0.5, mb: 0.5 }}>
+            Collections
+          </Typography>
+          <Typography variant="body2" sx={{ color: '#666' }}>
+            Manage custom groupings of products.
+          </Typography>
+        </div>
         <Button
           variant="contained"
           startIcon={<Add />}
           onClick={() => handleOpenDialog()}
-          sx={buttonSx}
+          sx={{
+            background: '#1E1B4B', color: '#fff', borderRadius: 2, padding: '8px 20px',
+            textTransform: 'none', fontWeight: 600, boxShadow: 'none',
+            '&:hover': { background: '#2D2963', boxShadow: 'none' }
+          }}
         >
           Add Collection
         </Button>
-      </Box>
+      </div>
 
-      {success && <Alert severity="success" className="!mb-4" onClose={() => setSuccess('')}>{success}</Alert>}
-      {error && <Alert severity="error" className="!mb-4" onClose={() => setError('')}>{error}</Alert>}
+      {success && <Alert severity="success" className="!mb-4" onClose={() => setSuccess('')} sx={{ borderRadius: 2 }}>{success}</Alert>}
+      {error && <Alert severity="error" className="!mb-4" onClose={() => setError('')} sx={{ borderRadius: 2 }}>{error}</Alert>}
 
-      <Paper elevation={2} sx={{ backgroundColor: 'white', borderRadius: 2 }}>
-        <DataGrid
-          rows={collections}
-          columns={columns}
-          getRowId={(row) => row.id}
-          loading={loading}
-          rowHeight={56}
-          initialState={{
-            pagination: { paginationModel: { pageSize: 10 } },
+      {/* ── Toolbar ── */}
+      <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #EBEBEB', padding: '16px', marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <TextField
+          placeholder="Search collections..."
+          size="small"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          InputProps={{
+            startAdornment: <InputAdornment position="start"><Search fontSize="small" sx={{ color: '#999' }} /></InputAdornment>,
+            sx: { borderRadius: 2, background: '#FAFAF8', '& fieldset': { borderColor: '#EBEBEB' }, fontSize: 14, width: 280 }
           }}
-          pageSizeOptions={[5, 10, 25]}
-          slots={{ toolbar: GridToolbar }}
-          slotProps={{
-            toolbar: {
-              showQuickFilter: true,
-              quickFilterProps: { debounceMs: 500 },
-            },
-          }}
-          disableRowSelectionOnClick
-          autoHeight
-          sx={{
-            border: 'none',
-            '& .MuiDataGrid-columnHeaders': { backgroundColor: '#f5f5f5', fontWeight: 'bold' },
-            '& .MuiDataGrid-row:hover': { backgroundColor: '#f9f9f9' },
-            '& .MuiDataGrid-toolbarContainer': { p: 2, gap: 2 },
-          }}
-          localeText={{ noRowsLabel: 'No collections yet. Create your first collection!' }}
         />
-      </Paper>
+        <ToggleButtonGroup
+          value={viewMode}
+          exclusive
+          onChange={(e, val) => val && setViewMode(val)}
+          size="small"
+          sx={{
+            background: '#FAFAF8',
+            '& .MuiToggleButton-root': { border: '1px solid #EBEBEB', color: '#888', padding: '6px 16px' },
+            '& .Mui-selected': { background: '#fff !important', color: '#1E1B4B !important', border: '1px solid #1E1B4B !important', boxShadow: '0 2px 8px rgba(0,0,0,0.05)', zIndex: 1 },
+          }}
+        >
+          <ToggleButton value="list"><ViewList fontSize="small" /></ToggleButton>
+          <ToggleButton value="grid"><GridView fontSize="small" /></ToggleButton>
+        </ToggleButtonGroup>
+      </div>
+
+      {/* ── Listing ── */}
+      {loading ? (
+        <div style={{ display: 'flex', justifyContent: 'center', padding: '60px 0' }}>
+          <CircularProgress sx={{ color: '#1E1B4B' }} />
+        </div>
+      ) : viewMode === 'list' ? (
+        <CollectionListView collections={filteredCollections} onEdit={handleOpenDialog} onDelete={handleDelete} />
+      ) : (
+        <CollectionGridView collections={filteredCollections} onEdit={handleOpenDialog} onDelete={handleDelete} />
+      )}
 
       {/* Add/Edit Collection Dialog */}
       <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="md" fullWidth>

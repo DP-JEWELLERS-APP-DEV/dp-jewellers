@@ -20,9 +20,12 @@ import {
   Switch,
   FormControlLabel,
   Tooltip,
+  ToggleButtonGroup,
+  ToggleButton,
 } from '@mui/material';
-import { DataGrid, GridToolbar } from '@mui/x-data-grid';
-import { Edit, Delete, Add, Close, Image as ImageIcon } from '@mui/icons-material';
+import { ViewList, GridView, Edit, Delete, Add, Close, Image as ImageIcon } from '@mui/icons-material';
+import BannerListView from '@/components/banners/BannerListView';
+import BannerGridView from '@/components/banners/BannerGridView';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { storage } from '@/lib/firebase';
@@ -58,6 +61,7 @@ export default function BannersPage() {
   const [openDialog, setOpenDialog] = useState(false);
   const [editingBanner, setEditingBanner] = useState(null);
   const [formData, setFormData] = useState({ ...emptyForm });
+  const [viewMode, setViewMode] = useState('grid'); // Default to grid for images
   const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState('');
 
@@ -199,129 +203,75 @@ export default function BannersPage() {
     }
   };
 
-  const columns = [
-    {
-      field: 'imageUrl',
-      headerName: 'Image',
-      width: 120,
-      sortable: false,
-      filterable: false,
-      renderCell: (params) => (
-        <Box sx={{ py: 0.5 }}>
-          {params.row.imageUrl ? (
-            <img
-              src={params.row.imageUrl}
-              alt={params.row.title}
-              style={{ width: 100, height: 50, objectFit: 'cover', borderRadius: 4 }}
-            />
-          ) : (
-            <ImageIcon sx={{ color: '#ccc', fontSize: 40 }} />
-          )}
-        </Box>
-      ),
-    },
-    { field: 'title', headerName: 'Title', flex: 1, minWidth: 150, sortable: true },
-    {
-      field: 'linkType',
-      headerName: 'Link',
-      width: 150,
-      sortable: true,
-      renderCell: (params) => {
-        if (params.row.linkType === 'category') return <Typography variant="body2">{params.row.linkTarget}</Typography>;
-        if (params.row.linkType === 'custom_collection') {
-          const col = customCollections.find((c) => c.id === params.row.linkTarget);
-          return <Typography variant="body2">{col ? col.name : params.row.linkTarget}</Typography>;
-        }
-        return <Typography variant="body2">Search Page</Typography>;
-      },
-    },
-    { field: 'displayOrder', headerName: 'Order', width: 80, sortable: true },
-    {
-      field: 'isActive',
-      headerName: 'Status',
-      width: 100,
-      sortable: true,
-      renderCell: (params) => (
-        <Chip
-          label={params.row.isActive !== false ? 'Active' : 'Inactive'}
-          color={params.row.isActive !== false ? 'success' : 'default'}
-          size="small"
-        />
-      ),
-    },
-    {
-      field: 'actions',
-      headerName: 'Actions',
-      width: 120,
-      sortable: false,
-      filterable: false,
-      renderCell: (params) => (
-        <>
-          <Tooltip title="Edit banner" arrow>
-            <IconButton size="small" onClick={() => handleOpenDialog(params.row)} sx={{ color: '#1E1B4B', mr: 0.5 }}>
-              <Edit fontSize="small" />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="Delete banner" arrow>
-            <IconButton size="small" onClick={() => handleDelete(params.row.id)} sx={{ color: '#d32f2f' }}>
-              <Delete fontSize="small" />
-            </IconButton>
-          </Tooltip>
-        </>
-      ),
-    },
-  ];
-
   return (
-    <div>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h4" className="font-bold" sx={{ color: '#1E1B4B' }}>
-          Banners
-        </Typography>
+    <div style={{ background: '#FAFAF8', minHeight: '100%', paddingBottom: 40 }}>
+      {/* ── Page Header ── */}
+      <div style={{ marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div>
+          <Typography variant="h4" sx={{ color: '#1E1B4B', fontWeight: 700, letterSpacing: -0.5, mb: 0.5 }}>
+            Banners
+          </Typography>
+          <Typography variant="body2" sx={{ color: '#666' }}>
+            Manage promotional banners for the storefront. Max {MAX_BANNERS} banners.
+          </Typography>
+        </div>
         <Button
           variant="contained"
           startIcon={<Add />}
           onClick={() => handleOpenDialog()}
-          sx={buttonSx}
           disabled={banners.length >= MAX_BANNERS}
+          sx={{
+            background: '#1E1B4B', color: '#fff', borderRadius: 2, padding: '8px 20px',
+            textTransform: 'none', fontWeight: 600, boxShadow: 'none',
+            '&:hover': { background: '#2D2963', boxShadow: 'none' },
+            '&.Mui-disabled': { background: '#ccc', color: '#fff' }
+          }}
         >
           {banners.length >= MAX_BANNERS ? `Max ${MAX_BANNERS} Banners` : 'Add Banner'}
         </Button>
-      </Box>
+      </div>
 
-      {success && <Alert severity="success" className="!mb-4" onClose={() => setSuccess('')}>{success}</Alert>}
-      {error && <Alert severity="error" className="!mb-4" onClose={() => setError('')}>{error}</Alert>}
+      {success && <Alert severity="success" className="!mb-4" onClose={() => setSuccess('')} sx={{ borderRadius: 2 }}>{success}</Alert>}
+      {error && <Alert severity="error" className="!mb-4" onClose={() => setError('')} sx={{ borderRadius: 2 }}>{error}</Alert>}
 
-      <Paper elevation={2} sx={{ backgroundColor: 'white', borderRadius: 2 }}>
-        <DataGrid
-          rows={banners}
-          columns={columns}
-          getRowId={(row) => row.id}
-          loading={loading}
-          rowHeight={70}
-          initialState={{
-            pagination: { paginationModel: { pageSize: 10 } },
-            sorting: { sortModel: [{ field: 'displayOrder', sort: 'asc' }] },
-          }}
-          pageSizeOptions={[5, 10]}
-          slots={{ toolbar: GridToolbar }}
-          slotProps={{
-            toolbar: {
-              showQuickFilter: true,
-              quickFilterProps: { debounceMs: 500 },
-            },
-          }}
-          disableRowSelectionOnClick
-          autoHeight
+      {/* ── Toolbar ── */}
+      <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #EBEBEB', padding: '16px', marginBottom: 24, display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
+        <ToggleButtonGroup
+          value={viewMode}
+          exclusive
+          onChange={(e, val) => val && setViewMode(val)}
+          size="small"
           sx={{
-            border: 'none',
-            '& .MuiDataGrid-columnHeaders': { backgroundColor: '#f5f5f5', fontWeight: 'bold' },
-            '& .MuiDataGrid-row:hover': { backgroundColor: '#f9f9f9' },
-            '& .MuiDataGrid-toolbarContainer': { p: 2, gap: 2 },
+            background: '#FAFAF8',
+            '& .MuiToggleButton-root': { border: '1px solid #EBEBEB', color: '#888', padding: '6px 16px' },
+            '& .Mui-selected': { background: '#fff !important', color: '#1E1B4B !important', border: '1px solid #1E1B4B !important', boxShadow: '0 2px 8px rgba(0,0,0,0.05)', zIndex: 1 },
           }}
-          localeText={{ noRowsLabel: 'No banners yet. Add your first banner!' }}
+        >
+          <ToggleButton value="grid"><GridView fontSize="small" /></ToggleButton>
+          <ToggleButton value="list"><ViewList fontSize="small" /></ToggleButton>
+        </ToggleButtonGroup>
+      </div>
+
+      {/* ── Listing ── */}
+      {loading ? (
+        <div style={{ display: 'flex', justifyContent: 'center', padding: '60px 0' }}>
+          <CircularProgress sx={{ color: '#1E1B4B' }} />
+        </div>
+      ) : viewMode === 'list' ? (
+        <BannerListView 
+          banners={banners} 
+          customCollections={customCollections} 
+          onEdit={handleOpenDialog} 
+          onDelete={handleDelete} 
         />
-      </Paper>
+      ) : (
+        <BannerGridView 
+          banners={banners} 
+          customCollections={customCollections} 
+          onEdit={handleOpenDialog} 
+          onDelete={handleDelete} 
+        />
+      )}
 
       {/* Add/Edit Banner Dialog */}
       <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
