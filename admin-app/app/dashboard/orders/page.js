@@ -1,14 +1,14 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Paper, Typography, Chip, IconButton, Alert, Box, Tooltip } from '@mui/material';
-import { DataGrid, GridToolbar } from '@mui/x-data-grid';
-import { Visibility, GetApp, Edit, Store, LocalShipping } from '@mui/icons-material';
+import { Paper, Typography, Chip, IconButton, Alert, Box, Tooltip, TextField, InputAdornment, CircularProgress } from '@mui/material';
+import { Visibility, GetApp, Edit, Store, LocalShipping, Search } from '@mui/icons-material';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import app from '@/lib/firebase';
 
 import OrderViewDialog from '@/components/orders/OrderViewDialog';
 import OrderEditDialog from '@/components/orders/OrderEditDialog';
+import OrderListView from '@/components/orders/OrderListView';
 import { generateOrderReceipt } from '@/components/orders/generateOrderReceipt';
 
 const functions = getFunctions(app, 'asia-south1');
@@ -64,6 +64,7 @@ export default function OrdersPage() {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState('');
   const [error, setError] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     fetchOrders();
@@ -153,125 +154,64 @@ export default function OrdersPage() {
     generateOrderReceipt(order, { getStoreName, getStoreAddress, formatDate, formatDateOnly, formatAddress });
   };
 
-  // ─── DataGrid columns ───────────────────────────────────────────────────────
-
-  const columns = [
-    {
-      field: 'orderId', headerName: 'Order ID', width: 140,
-      valueGetter: (_, row) => row.orderId || row.id?.slice(-8).toUpperCase() || '',
-      renderCell: (params) => `#${params.row.orderId || params.row.id?.slice(-8).toUpperCase()}`,
-    },
-    {
-      field: 'customer', headerName: 'Customer', flex: 1, minWidth: 150,
-      valueGetter: (_, row) => row.userName || '',
-      renderCell: (params) => (
-        <Box>
-          <div>{params.row.userName}</div>
-          <Typography variant="caption" sx={{ color: '#666' }}>{params.row.userPhone}</Typography>
-        </Box>
-      ),
-    },
-    {
-      field: 'createdAt', headerName: 'Order Date', width: 160,
-      valueGetter: (_, row) => row.createdAt || row.orderedAt ? new Date(row.createdAt || row.orderedAt) : null,
-      renderCell: (params) => formatDate(params.row.createdAt || params.row.orderedAt),
-    },
-    {
-      field: 'estimatedDeliveryDate', headerName: 'Est. Delivery', width: 120,
-      valueGetter: (_, row) => row.estimatedDeliveryDate ? new Date(row.estimatedDeliveryDate) : null,
-      renderCell: (params) => formatDateOnly(params.row.estimatedDeliveryDate),
-    },
-    {
-      field: 'totalAmount', headerName: 'Amount', width: 120,
-      valueGetter: (_, row) => row.totalAmount || row.orderSummary?.totalAmount || 0,
-      renderCell: (params) => `₹${(params.row.totalAmount || params.row.orderSummary?.totalAmount || 0).toLocaleString('en-IN')}`,
-    },
-    {
-      field: 'deliveryType', headerName: 'Delivery', width: 100,
-      renderCell: (params) => {
-        const isPickup = params.row.deliveryType === 'pickup' || params.row.deliveryType === 'store_pickup';
-        return (
-          <Chip
-            icon={isPickup ? <Store fontSize="small" /> : <LocalShipping fontSize="small" />}
-            label={isPickup ? 'Pickup' : 'Delivery'}
-            size="small" variant="outlined"
-          />
-        );
-      },
-    },
-    {
-      field: 'status', headerName: 'Status', width: 140,
-      valueGetter: (_, row) => row.status || row.orderStatus || 'pending',
-      renderCell: (params) => {
-        const s = params.row.status || params.row.orderStatus;
-        return (
-          <Chip
-            label={(s || 'pending').replace(/_/g, ' ').toUpperCase()}
-            color={statusColors[s] || 'default'}
-            size="small"
-          />
-        );
-      },
-    },
-    {
-      field: 'actions', headerName: 'Actions', width: 140, sortable: false, filterable: false,
-      renderCell: (params) => (
-        <>
-          <Tooltip title="View order details" arrow>
-            <IconButton size="small" onClick={() => handleViewOrder(params.row)} sx={{ color: '#1E1B4B', mr: 0.5 }}>
-              <Visibility fontSize="small" />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="Update order status" arrow>
-            <IconButton size="small" onClick={() => handleEditStatus(params.row)} sx={{ color: '#1E1B4B', mr: 0.5 }}>
-              <Edit fontSize="small" />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="Download receipt PDF" arrow>
-            <IconButton size="small" onClick={() => handleDownloadReceipt(params.row)} sx={{ color: '#1E1B4B' }}>
-              <GetApp fontSize="small" />
-            </IconButton>
-          </Tooltip>
-        </>
-      ),
-    },
-  ];
+  // ─── Filter Logic ─────────────────────────────────────────────────────────────
+  
+  const filteredOrders = orders.filter((o) => {
+    if (!searchQuery) return true;
+    const sq = searchQuery.toLowerCase();
+    const idMatch = (o.orderId || o.id || '').toLowerCase().includes(sq);
+    const nameMatch = (o.userName || '').toLowerCase().includes(sq);
+    const phoneMatch = (o.userPhone || '').toLowerCase().includes(sq);
+    const statusMatch = (o.status || o.orderStatus || '').toLowerCase().includes(sq);
+    return idMatch || nameMatch || phoneMatch || statusMatch;
+  });
 
   // ─── Render ─────────────────────────────────────────────────────────────────
 
   return (
-    <div>
-      <Typography variant="h4" fontWeight={700} sx={{ color: '#1E1B4B', mb: 3 }}>
-        Orders Management
-      </Typography>
+    <div style={{ background: '#FAFAF8', minHeight: '100%', paddingBottom: 40 }}>
+      {/* ── Page Header ── */}
+      <div style={{ marginBottom: 24 }}>
+        <Typography variant="h4" sx={{ color: '#1E1B4B', fontWeight: 700, letterSpacing: -0.5, mb: 0.5 }}>
+          Orders
+        </Typography>
+        <Typography variant="body2" sx={{ color: '#666' }}>
+          Manage customer orders, track statuses, and download receipts.
+        </Typography>
+      </div>
 
-      {success && <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess('')}>{success}</Alert>}
-      {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>{error}</Alert>}
+      {success && <Alert severity="success" sx={{ mb: 2, borderRadius: 2 }} onClose={() => setSuccess('')}>{success}</Alert>}
+      {error && <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }} onClose={() => setError('')}>{error}</Alert>}
 
-      <Paper elevation={2} sx={{ backgroundColor: 'white', borderRadius: 2 }}>
-        <DataGrid
-          rows={orders}
-          columns={columns}
-          getRowId={(row) => row.id}
-          loading={loading && orders.length === 0}
-          initialState={{
-            pagination: { paginationModel: { pageSize: 10 } },
-            sorting: { sortModel: [{ field: 'createdAt', sort: 'desc' }] },
+      {/* ── Toolbar ── */}
+      <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #EBEBEB', padding: '16px', marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <TextField
+          placeholder="Search by ID, Customer, Phone, or Status..."
+          size="small"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          InputProps={{
+            startAdornment: <InputAdornment position="start"><Search fontSize="small" sx={{ color: '#999' }} /></InputAdornment>,
+            sx: { borderRadius: 2, background: '#FAFAF8', '& fieldset': { borderColor: '#EBEBEB' }, fontSize: 14, width: 340 }
           }}
-          pageSizeOptions={[10, 25, 50]}
-          slots={{ toolbar: GridToolbar }}
-          slotProps={{ toolbar: { showQuickFilter: true, quickFilterProps: { debounceMs: 500 } } }}
-          disableRowSelectionOnClick
-          autoHeight
-          sx={{
-            border: 'none',
-            '& .MuiDataGrid-columnHeaders': { backgroundColor: '#f5f5f5', fontWeight: 'bold' },
-            '& .MuiDataGrid-row:hover': { backgroundColor: '#f9f9f9' },
-            '& .MuiDataGrid-toolbarContainer': { p: 2, gap: 2 },
-          }}
-          localeText={{ noRowsLabel: 'No orders found' }}
         />
-      </Paper>
+      </div>
+
+      {/* ── Listing ── */}
+      {loading && orders.length === 0 ? (
+        <div style={{ display: 'flex', justifyContent: 'center', padding: '60px 0' }}>
+          <CircularProgress sx={{ color: '#1E1B4B' }} />
+        </div>
+      ) : (
+        <OrderListView 
+          orders={filteredOrders}
+          onView={handleViewOrder}
+          onEditStatus={handleEditStatus}
+          onDownloadReceipt={handleDownloadReceipt}
+          formatDate={formatDate}
+          formatDateOnly={formatDateOnly}
+        />
+      )}
 
       {/* ── Dialogs ── */}
       <OrderViewDialog

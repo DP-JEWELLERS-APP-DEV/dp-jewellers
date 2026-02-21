@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import {
-  Paper,
   Typography,
   Button,
   Grid,
@@ -13,6 +12,7 @@ import {
   FormControl,
   CircularProgress,
   Chip,
+  InputAdornment,
 } from '@mui/material';
 import { AccessTime } from '@mui/icons-material';
 import { getFunctions, httpsCallable } from 'firebase/functions';
@@ -21,19 +21,33 @@ import app from '@/lib/firebase';
 const functions = getFunctions(app, 'asia-south1');
 
 const inputSx = {
-  height: '40px',
-  '& .MuiOutlinedInput-notchedOutline': { borderColor: '#ccc' },
-  '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: '#000' },
+  height: '44px',
+  borderRadius: 2,
+  background: '#FAFAF8',
+  '& .MuiOutlinedInput-notchedOutline': { borderColor: '#EBEBEB' },
+  '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: '#ccc' },
   '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#1E1B4B' },
 };
 
 const buttonSx = {
-  backgroundColor: '#1E1B4B',
-  '&:hover': { backgroundColor: '#2D2963' },
+  background: '#1E1B4B',
+  color: '#fff',
+  borderRadius: 2,
+  padding: '10px 24px',
   textTransform: 'none',
-  height: '40px',
-  px: 3,
+  fontWeight: 600,
+  boxShadow: 'none',
+  '&:hover': { background: '#2D2963', boxShadow: 'none' },
+  '&.Mui-disabled': { background: '#ccc', color: '#fff' }
 };
+
+const CardWrapper = ({ title, subtitle, children }) => (
+  <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #EBEBEB', padding: '24px', marginBottom: '24px' }}>
+    <Typography variant="h6" sx={{ color: '#1E1B4B', fontWeight: 700, mb: 0.5 }}>{title}</Typography>
+    {subtitle && <Typography variant="body2" sx={{ color: '#666', mb: 3 }}>{subtitle}</Typography>}
+    {children}
+  </div>
+);
 
 export default function PricingPage() {
   const [metalRates, setMetalRates] = useState({
@@ -137,189 +151,160 @@ export default function PricingPage() {
   }
 
   return (
-    <div>
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
-        <Typography variant="h4" className="font-bold" sx={{ color: '#1E1B4B' }}>
-          Pricing Management
-        </Typography>
-        {lastRateUpdate && (
-          <Chip
-            icon={<AccessTime />}
-            label={`Last updated: ${lastRateUpdate.toLocaleString('en-IN')}`}
-            variant="outlined"
-            size="small"
-          />
-        )}
-      </Box>
+    <div style={{ background: '#FAFAF8', minHeight: '100%', paddingBottom: 40 }}>
+      {/* ── Page Header ── */}
+      <div style={{ marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div>
+          <Typography variant="h4" sx={{ color: '#1E1B4B', fontWeight: 700, letterSpacing: -0.5, mb: 0.5 }}>
+            Pricing Management
+          </Typography>
+          <Typography variant="body2" sx={{ color: '#666', display: 'flex', alignItems: 'center', gap: 1 }}>
+            Manage daily metal and diamond rates.
+            {lastRateUpdate && (
+              <Chip
+                icon={<AccessTime sx={{ fontSize: 14 }} />}
+                label={`Last updated: ${lastRateUpdate.toLocaleString('en-IN')}`}
+                size="small"
+                sx={{ ml: 1, background: '#fff', border: '1px solid #EBEBEB', color: '#666', fontWeight: 500, height: 24, '& .MuiChip-icon': { color: '#666' } }}
+              />
+            )}
+          </Typography>
+        </div>
+        <Button
+          variant="contained"
+          onClick={handleMetalRatesUpdate}
+          disabled={saving}
+          sx={buttonSx}
+        >
+          {saving ? 'Saving...' : 'Update All Rates'}
+        </Button>
+      </div>
 
-      {success && <Alert severity="success" className="!mb-4" onClose={() => setSuccess('')}>{success}</Alert>}
-      {error && <Alert severity="error" className="!mb-4" onClose={() => setError('')}>{error}</Alert>}
+      {success && <Alert severity="success" sx={{ mb: 3, borderRadius: 2 }} onClose={() => setSuccess('')}>{success}</Alert>}
+      {error && <Alert severity="error" sx={{ mb: 3, borderRadius: 2 }} onClose={() => setError('')}>{error}</Alert>}
 
-      {/* Metal Rates Section */}
-      <Paper elevation={2} sx={{ p: 4, mb: 4, backgroundColor: 'white', borderRadius: 2 }}>
-        <Typography variant="h6" className="!mb-2" sx={{ color: '#1E1B4B', fontWeight: 'bold' }}>
-          Gold Rates (per gram)
-        </Typography>
-        <Typography variant="body2" sx={{ color: '#666', mb: 3 }}>
-          Update daily gold rates. All product prices will recalculate automatically.
-        </Typography>
-
-        <Grid container spacing={3}>
-          <Grid item xs={12} sm={6} md={3}>
-            <FormControl fullWidth size="small">
-              <InputLabel>24K Gold (₹/gram)</InputLabel>
-              <OutlinedInput type="number" label="24K Gold (₹/gram)"
-                value={metalRates.gold24K}
-                onChange={(e) => setMetalRates({ ...metalRates, gold24K: e.target.value })}
-                sx={inputSx}
-              />
-            </FormControl>
-          </Grid>
-          <Grid item xs={12} sm={6} md={3}>
-            <FormControl fullWidth size="small">
-              <InputLabel>22K Gold (₹/gram)</InputLabel>
-              <OutlinedInput type="number" label="22K Gold (₹/gram)"
-                value={metalRates.gold22K}
-                onChange={(e) => setMetalRates({ ...metalRates, gold22K: e.target.value })}
-                sx={inputSx}
-              />
-            </FormControl>
-          </Grid>
-          <Grid item xs={12} sm={6} md={3}>
-            <FormControl fullWidth size="small">
-              <InputLabel>18K Gold (₹/gram)</InputLabel>
-              <OutlinedInput type="number" label="18K Gold (₹/gram)"
-                value={metalRates.gold18K}
-                onChange={(e) => setMetalRates({ ...metalRates, gold18K: e.target.value })}
-                sx={inputSx}
-              />
-            </FormControl>
-          </Grid>
-          <Grid item xs={12} sm={6} md={3}>
-            <FormControl fullWidth size="small">
-              <InputLabel>14K Gold (₹/gram)</InputLabel>
-              <OutlinedInput type="number" label="14K Gold (₹/gram)"
-                value={metalRates.gold14K}
-                onChange={(e) => setMetalRates({ ...metalRates, gold14K: e.target.value })}
-                sx={inputSx}
-              />
-            </FormControl>
-          </Grid>
-        </Grid>
-
-        <Typography variant="h6" className="!mt-6 !mb-2" sx={{ color: '#1E1B4B', fontWeight: 'bold' }}>
-          Silver Rates (per gram)
-        </Typography>
-        <Grid container spacing={3}>
-          <Grid item xs={12} sm={6} md={3}>
-            <FormControl fullWidth size="small">
-              <InputLabel>925 Sterling (₹/gram)</InputLabel>
-              <OutlinedInput type="number" label="925 Sterling (₹/gram)"
-                value={metalRates.silver925}
-                onChange={(e) => setMetalRates({ ...metalRates, silver925: e.target.value })}
-                sx={inputSx}
-              />
-            </FormControl>
-          </Grid>
-          <Grid item xs={12} sm={6} md={3}>
-            <FormControl fullWidth size="small">
-              <InputLabel>999 Pure (₹/gram)</InputLabel>
-              <OutlinedInput type="number" label="999 Pure (₹/gram)"
-                value={metalRates.silver999}
-                onChange={(e) => setMetalRates({ ...metalRates, silver999: e.target.value })}
-                sx={inputSx}
-              />
-            </FormControl>
-          </Grid>
-        </Grid>
-
-        <Typography variant="h6" className="!mt-6 !mb-2" sx={{ color: '#1E1B4B', fontWeight: 'bold' }}>
-          Platinum Rates (per gram)
-        </Typography>
-        <Grid container spacing={3}>
-          <Grid item xs={12} sm={6} md={3}>
-            <FormControl fullWidth size="small">
-              <InputLabel>950 Platinum (₹/gram)</InputLabel>
-              <OutlinedInput type="number" label="950 Platinum (₹/gram)"
-                value={metalRates.platinum950}
-                onChange={(e) => setMetalRates({ ...metalRates, platinum950: e.target.value })}
-                sx={inputSx}
-              />
-            </FormControl>
-          </Grid>
-        </Grid>
-
-        <Typography variant="h6" className="!mt-6 !mb-2" sx={{ color: '#1E1B4B', fontWeight: 'bold' }}>
-          Diamond Rates (per carat)
-        </Typography>
-        <Typography variant="body2" sx={{ color: '#666', mb: 2 }}>
-          Rates by clarity-color grade combination.
-        </Typography>
-        <Grid container spacing={3}>
-          <Grid item xs={12} sm={6} md={2.4}>
-            <FormControl fullWidth size="small">
-              <InputLabel>SI I-J (₹/ct)</InputLabel>
-              <OutlinedInput type="number" label="SI I-J (₹/ct)"
-                value={metalRates.diamondSI_IJ}
-                onChange={(e) => setMetalRates({ ...metalRates, diamondSI_IJ: e.target.value })}
-                sx={inputSx}
-              />
-            </FormControl>
-          </Grid>
-          <Grid item xs={12} sm={6} md={2.4}>
-            <FormControl fullWidth size="small">
-              <InputLabel>SI G-H (₹/ct)</InputLabel>
-              <OutlinedInput type="number" label="SI G-H (₹/ct)"
-                value={metalRates.diamondSI_GH}
-                onChange={(e) => setMetalRates({ ...metalRates, diamondSI_GH: e.target.value })}
-                sx={inputSx}
-              />
-            </FormControl>
-          </Grid>
-          <Grid item xs={12} sm={6} md={2.4}>
-            <FormControl fullWidth size="small">
-              <InputLabel>VS G-H (₹/ct)</InputLabel>
-              <OutlinedInput type="number" label="VS G-H (₹/ct)"
-                value={metalRates.diamondVS_GH}
-                onChange={(e) => setMetalRates({ ...metalRates, diamondVS_GH: e.target.value })}
-                sx={inputSx}
-              />
-            </FormControl>
-          </Grid>
-          <Grid item xs={12} sm={6} md={2.4}>
-            <FormControl fullWidth size="small">
-              <InputLabel>VVS E-F (₹/ct)</InputLabel>
-              <OutlinedInput type="number" label="VVS E-F (₹/ct)"
-                value={metalRates.diamondVVS_EF}
-                onChange={(e) => setMetalRates({ ...metalRates, diamondVVS_EF: e.target.value })}
-                sx={inputSx}
-              />
-            </FormControl>
-          </Grid>
-          <Grid item xs={12} sm={6} md={2.4}>
-            <FormControl fullWidth size="small">
-              <InputLabel>IF D-F (₹/ct)</InputLabel>
-              <OutlinedInput type="number" label="IF D-F (₹/ct)"
-                value={metalRates.diamondIF_DEF}
-                onChange={(e) => setMetalRates({ ...metalRates, diamondIF_DEF: e.target.value })}
-                sx={inputSx}
-              />
-            </FormControl>
-          </Grid>
-        </Grid>
-
-        <Box sx={{ mt: 3 }}>
-          <Button
-            variant="contained"
-            onClick={handleMetalRatesUpdate}
-            disabled={saving}
-            size="small"
-            sx={buttonSx}
+      <Grid container spacing={3}>
+        <Grid item xs={12} lg={8}>
+          {/* Gold Rates Card */}
+          <CardWrapper 
+            title="Gold Rates (per gram)" 
+            subtitle="Update daily gold rates. Product prices will recalculate based on their purity."
           >
-            {saving ? 'Saving...' : 'Update All Rates'}
-          </Button>
-        </Box>
-      </Paper>
+            <Grid container spacing={3}>
+              {['24K', '22K', '18K', '14K'].map((k) => (
+                <Grid item xs={12} sm={6} md={3} key={k}>
+                  <FormControl fullWidth size="small">
+                    <InputLabel sx={{ color: '#666', '&.Mui-focused': { color: '#1E1B4B' } }}>{k} Gold</InputLabel>
+                    <OutlinedInput 
+                      type="number" 
+                      label={`${k} Gold`}
+                      value={metalRates[`gold${k}`]}
+                      onChange={(e) => setMetalRates({ ...metalRates, [`gold${k}`]: e.target.value })}
+                      startAdornment={<InputAdornment position="start">₹</InputAdornment>}
+                      sx={inputSx}
+                    />
+                  </FormControl>
+                </Grid>
+              ))}
+            </Grid>
+          </CardWrapper>
+
+          {/* Silver & Platinum Rates Card */}
+          <CardWrapper title="Silver & Platinum Rates (per gram)">
+            <Grid container spacing={3}>
+              <Grid item xs={12} sm={6} md={4}>
+                <FormControl fullWidth size="small">
+                  <InputLabel sx={{ color: '#666', '&.Mui-focused': { color: '#1E1B4B' } }}>925 Sterling Silver</InputLabel>
+                  <OutlinedInput 
+                    type="number" 
+                    label="925 Sterling Silver"
+                    value={metalRates.silver925}
+                    onChange={(e) => setMetalRates({ ...metalRates, silver925: e.target.value })}
+                    startAdornment={<InputAdornment position="start">₹</InputAdornment>}
+                    sx={inputSx}
+                  />
+                </FormControl>
+              </Grid>
+              <Grid item xs={12} sm={6} md={4}>
+                <FormControl fullWidth size="small">
+                  <InputLabel sx={{ color: '#666', '&.Mui-focused': { color: '#1E1B4B' } }}>999 Pure Silver</InputLabel>
+                  <OutlinedInput 
+                    type="number" 
+                    label="999 Pure Silver"
+                    value={metalRates.silver999}
+                    onChange={(e) => setMetalRates({ ...metalRates, silver999: e.target.value })}
+                    startAdornment={<InputAdornment position="start">₹</InputAdornment>}
+                    sx={inputSx}
+                  />
+                </FormControl>
+              </Grid>
+              <Grid item xs={12} sm={6} md={4}>
+                <FormControl fullWidth size="small">
+                  <InputLabel sx={{ color: '#666', '&.Mui-focused': { color: '#1E1B4B' } }}>950 Platinum</InputLabel>
+                  <OutlinedInput 
+                    type="number" 
+                    label="950 Platinum"
+                    value={metalRates.platinum950}
+                    onChange={(e) => setMetalRates({ ...metalRates, platinum950: e.target.value })}
+                    startAdornment={<InputAdornment position="start">₹</InputAdornment>}
+                    sx={inputSx}
+                  />
+                </FormControl>
+              </Grid>
+            </Grid>
+          </CardWrapper>
+
+          {/* Diamond Rates Card */}
+          <CardWrapper 
+            title="Diamond Rates (per carat)" 
+            subtitle="Set baseline rates for various clarity-color grade combinations."
+          >
+            <Grid container spacing={3}>
+              {[
+                { label: 'SI I-J', key: 'diamondSI_IJ' },
+                { label: 'SI G-H', key: 'diamondSI_GH' },
+                { label: 'VS G-H', key: 'diamondVS_GH' },
+                { label: 'VVS E-F', key: 'diamondVVS_EF' },
+                { label: 'IF D-F', key: 'diamondIF_DEF' },
+              ].map((d) => (
+                <Grid item xs={12} sm={6} md={4} key={d.key}>
+                  <FormControl fullWidth size="small">
+                    <InputLabel sx={{ color: '#666', '&.Mui-focused': { color: '#1E1B4B' } }}>{d.label}</InputLabel>
+                    <OutlinedInput 
+                      type="number" 
+                      label={d.label}
+                      value={metalRates[d.key]}
+                      onChange={(e) => setMetalRates({ ...metalRates, [d.key]: e.target.value })}
+                      startAdornment={<InputAdornment position="start">₹</InputAdornment>}
+                      sx={inputSx}
+                    />
+                  </FormControl>
+                </Grid>
+              ))}
+            </Grid>
+          </CardWrapper>
+        </Grid>
+
+        <Grid item xs={12} lg={4}>
+          <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #EBEBEB', padding: '24px', position: 'sticky', top: 24 }}>
+            <Typography variant="h6" sx={{ color: '#1E1B4B', fontWeight: 700, mb: 2 }}>Summary & Actions</Typography>
+            <div style={{ fontSize: 13, color: '#666', lineHeight: 1.6, marginBottom: 24 }}>
+              Updating metal and diamond rates will automatically trigger a recalculation of all dynamic product prices in the catalog.
+              <br /><br />
+              Please double-check your inputs before saving. Current rates will remain untouched until approved if a maker-checker workflow is enabled.
+            </div>
+            <Button
+              variant="contained"
+              onClick={handleMetalRatesUpdate}
+              disabled={saving}
+              fullWidth
+              sx={{ ...buttonSx, py: 1.5 }}
+            >
+              {saving ? 'Applying Updates...' : 'Publish New Rates'}
+            </Button>
+          </div>
+        </Grid>
+      </Grid>
     </div>
   );
 }

@@ -20,9 +20,10 @@ import {
   Switch,
   FormControlLabel,
   Tooltip,
+  InputAdornment,
 } from '@mui/material';
-import { DataGrid, GridToolbar } from '@mui/x-data-grid';
-import { Edit, Delete, Add, Store, Close } from '@mui/icons-material';
+import { Edit, Delete, Add, Store, Close, Search } from '@mui/icons-material';
+import StoreListView from '@/components/stores/StoreListView';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import app from '@/lib/firebase';
 
@@ -56,6 +57,7 @@ export default function StoresPage() {
   const [openDialog, setOpenDialog] = useState(false);
   const [editingStore, setEditingStore] = useState(null);
   const [formData, setFormData] = useState({ ...emptyForm });
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     fetchStores();
@@ -147,118 +149,71 @@ export default function StoresPage() {
     }
   };
 
+  const filteredStores = stores.filter((s) => {
+    if (!searchQuery) return true;
+    const sq = searchQuery.toLowerCase();
+    const nameMatch = (s.name || '').toLowerCase().includes(sq);
+    const addressMatch = (s.address || '').toLowerCase().includes(sq);
+    const cityMatch = (s.city || '').toLowerCase().includes(sq);
+    const phoneMatch = (s.phone || '').toLowerCase().includes(sq);
+    return nameMatch || addressMatch || cityMatch || phoneMatch;
+  });
+
   return (
-    <div>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h4" className="font-bold" sx={{ color: '#1E1B4B' }}>
-          Store Locations
-        </Typography>
+    <div style={{ background: '#FAFAF8', minHeight: '100%', paddingBottom: 40 }}>
+      {/* ── Page Header ── */}
+      <div style={{ marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div>
+          <Typography variant="h4" sx={{ color: '#1E1B4B', fontWeight: 700, letterSpacing: -0.5, mb: 0.5 }}>
+            Store Locations
+          </Typography>
+          <Typography variant="body2" sx={{ color: '#666' }}>
+            Manage physical stores and pickup locations.
+          </Typography>
+        </div>
         <Button
           variant="contained"
           startIcon={<Add />}
           onClick={() => handleOpenDialog()}
-          sx={buttonSx}
+          sx={{
+            background: '#1E1B4B', color: '#fff', borderRadius: 2, padding: '8px 20px',
+            textTransform: 'none', fontWeight: 600, boxShadow: 'none',
+            '&:hover': { background: '#2D2963', boxShadow: 'none' }
+          }}
         >
           Add Store
         </Button>
-      </Box>
+      </div>
 
-      {success && <Alert severity="success" className="!mb-4" onClose={() => setSuccess('')}>{success}</Alert>}
-      {error && <Alert severity="error" className="!mb-4" onClose={() => setError('')}>{error}</Alert>}
+      {success && <Alert severity="success" className="!mb-4" onClose={() => setSuccess('')} sx={{ borderRadius: 2 }}>{success}</Alert>}
+      {error && <Alert severity="error" className="!mb-4" onClose={() => setError('')} sx={{ borderRadius: 2 }}>{error}</Alert>}
 
-      <Paper elevation={2} sx={{ backgroundColor: 'white', borderRadius: 2 }}>
-        <DataGrid
-          rows={stores}
-          columns={[
-            { field: 'name', headerName: 'Store Name', flex: 1, minWidth: 150, sortable: true },
-            {
-              field: 'address',
-              headerName: 'Address',
-              flex: 1.5,
-              minWidth: 200,
-              sortable: true,
-              renderCell: (params) => (
-                <Box>
-                  <div>{params.row.address}</div>
-                  <Typography variant="caption" sx={{ color: '#666' }}>
-                    {params.row.city}, {params.row.state} - {params.row.pincode}
-                  </Typography>
-                </Box>
-              ),
-            },
-            { field: 'phone', headerName: 'Phone', width: 130, sortable: true },
-            { field: 'openingHours', headerName: 'Hours', width: 150, sortable: true },
-            {
-              field: 'isPrimary',
-              headerName: 'Primary',
-              width: 90,
-              sortable: true,
-              renderCell: (params) => (
-                params.row.isPrimary ? (
-                  <Chip label="Primary" color="primary" size="small" />
-                ) : null
-              ),
-            },
-            {
-              field: 'isActive',
-              headerName: 'Status',
-              width: 100,
-              sortable: true,
-              renderCell: (params) => (
-                <Chip
-                  label={params.row.isActive !== false ? 'Active' : 'Inactive'}
-                  color={params.row.isActive !== false ? 'success' : 'default'}
-                  size="small"
-                />
-              ),
-            },
-            {
-              field: 'actions',
-              headerName: 'Actions',
-              width: 120,
-              sortable: false,
-              filterable: false,
-              renderCell: (params) => (
-                <>
-                  <Tooltip title="Edit store details (address, phone, hours)" arrow>
-                    <IconButton size="small" onClick={() => handleOpenDialog(params.row)} sx={{ color: '#1E1B4B', mr: 0.5 }}>
-                      <Edit fontSize="small" />
-                    </IconButton>
-                  </Tooltip>
-                  <Tooltip title="Delete store: Permanently remove this location" arrow>
-                    <IconButton size="small" onClick={() => handleDelete(params.row.id)} sx={{ color: '#d32f2f' }}>
-                      <Delete fontSize="small" />
-                    </IconButton>
-                  </Tooltip>
-                </>
-              ),
-            },
-          ]}
-          getRowId={(row) => row.id}
-          loading={loading}
-          initialState={{
-            pagination: { paginationModel: { pageSize: 10 } },
-            sorting: { sortModel: [{ field: 'name', sort: 'asc' }] },
+      {/* ── Toolbar ── */}
+      <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #EBEBEB', padding: '16px', marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <TextField
+          placeholder="Search stores by Name, City, or Phone..."
+          size="small"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          InputProps={{
+            startAdornment: <InputAdornment position="start"><Search fontSize="small" sx={{ color: '#999' }} /></InputAdornment>,
+            sx: { borderRadius: 2, background: '#FAFAF8', '& fieldset': { borderColor: '#EBEBEB' }, fontSize: 14, width: 340 }
           }}
-          pageSizeOptions={[10, 25, 50]}
-          slots={{ toolbar: GridToolbar }}
-          slotProps={{
-            toolbar: {
-              showQuickFilter: true,
-              quickFilterProps: { debounceMs: 500 },
-            },
-          }}
-          disableRowSelectionOnClick
-          autoHeight
-          sx={{
-            border: 'none',
-            '& .MuiDataGrid-columnHeaders': { backgroundColor: '#f5f5f5', fontWeight: 'bold' },
-            '& .MuiDataGrid-row:hover': { backgroundColor: '#f9f9f9' },
-            '& .MuiDataGrid-toolbarContainer': { p: 2, gap: 2 },
-          }}
-          localeText={{ noRowsLabel: 'No stores found. Add your first store!' }}
         />
-      </Paper>
+      </div>
+
+      {/* ── Listing ── */}
+      {loading ? (
+        <div style={{ display: 'flex', justifyContent: 'center', padding: '60px 0' }}>
+          <CircularProgress sx={{ color: '#1E1B4B' }} />
+        </div>
+      ) : (
+        <StoreListView 
+          stores={filteredStores} 
+          onEdit={handleOpenDialog} 
+          onDelete={handleDelete} 
+        />
+      )}
 
       {/* Add/Edit Store Dialog */}
       <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
