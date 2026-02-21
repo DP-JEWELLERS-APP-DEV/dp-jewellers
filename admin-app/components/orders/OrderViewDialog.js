@@ -53,7 +53,9 @@ export default function OrderViewDialog({
   const hasValidPaymentId = typeof order.paymentId === 'string' && order.paymentId.startsWith('pay_');
   const isPaidViaGateway = isPaidStatus || hasValidPaymentId;
 
-  const amountPaid = order.partialPayment?.isPartialPayment ? (order.partialPayment.amountPaid || 0) : (isPaidViaGateway ? totalAmount : 0);
+  const amountPaid = isPaidViaGateway 
+    ? (order.partialPayment?.isPartialPayment ? (order.partialPayment.amountPaid || 0) : totalAmount) 
+    : 0;
   const balanceDue = Math.max(0, totalAmount - amountPaid);
 
   return (

@@ -17,7 +17,9 @@ export function generateOrderReceipt(order, { getStoreName, getStoreAddress, for
   const hasValidPaymentId = typeof order.paymentId === 'string' && order.paymentId.startsWith('pay_');
   const isPaidViaGateway = isPaidStatus || hasValidPaymentId;
 
-  const amountPaidNum = order.partialPayment?.isPartialPayment ? (order.partialPayment.amountPaid || 0) : (isPaidViaGateway ? totalAmountNum : 0);
+  const amountPaidNum = isPaidViaGateway 
+    ? (order.partialPayment?.isPartialPayment ? (order.partialPayment.amountPaid || 0) : totalAmountNum) 
+    : 0;
   const balanceDueNum = Math.max(0, totalAmountNum - amountPaidNum);
 
   const itemsHtml = (order.items || []).map((item, idx) => {
