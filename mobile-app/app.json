@@ -2,20 +2,21 @@
   "expo": {
     "name": "DP Jewellers",
     "slug": "pn-rn-JewelleryEmpire",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/images/apk-logo.png",
     "scheme": "myapp",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "bundleIdentifier": "com.pn.rnexpo_jewelleryempire",
-      "buildNumber": "1.0.0",
+      "bundleIdentifier": "com.dpjewellers.app",
+      "buildNumber": "1.0.1",
       "supportsTablet": false
     },
     "android": {
-      "package": "com.render.rnexpo_jewelleryempire",
-      "versionCode": 1,
+      "package": "com.dpjewellers.app",
+      "googleServicesFile": "./google-services.json",
+      "versionCode": 2,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/apk-logo-android.png",
         "backgroundColor": "#ffffff"
@@ -38,7 +39,9 @@
         }
       ],
       "expo-font",
-      "expo-web-browser"
+      "expo-web-browser",
+      "@react-native-firebase/app",
+      "@react-native-firebase/auth"
     ],
     "experiments": {
       "typedRoutes": true

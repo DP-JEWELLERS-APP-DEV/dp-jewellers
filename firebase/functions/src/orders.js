@@ -246,7 +246,7 @@ exports.createOrder = onCall({ region: "asia-south1", secrets: ["RAZORPAY_KEY_ID
     trackingUpdates: [
       {
         status: "pending",
-        timestamp: admin.firestore.FieldValue.serverTimestamp(),
+        timestamp: new Date().toISOString(),
         note: "Order placed successfully.",
       },
     ],

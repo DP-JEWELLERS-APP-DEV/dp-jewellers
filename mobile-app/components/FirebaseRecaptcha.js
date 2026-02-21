@@ -123,18 +123,20 @@ const FirebaseRecaptcha = forwardRef(({ firebaseConfig, onVerify, onError, hideU
   if (hideUI) {
     if (!visible) return null;
     return (
-      <View style={styles.hiddenContainer} pointerEvents="none">
-        <WebView
-          ref={webViewRef}
-          source={{ html, baseUrl }}
-          onMessage={handleMessage}
-          javaScriptEnabled
-          domStorageEnabled
-          startInLoadingState
-          renderLoading={() => null}
-          style={styles.hiddenWebview}
-        />
-      </View>
+      <Modal visible={visible} transparent animationType="none" onRequestClose={() => setVisible(false)}>
+        <View style={styles.hiddenContainer} pointerEvents="none">
+          <WebView
+            ref={webViewRef}
+            source={{ html, baseUrl }}
+            onMessage={handleMessage}
+            javaScriptEnabled
+            domStorageEnabled
+            startInLoadingState
+            renderLoading={() => null}
+            style={styles.hiddenWebview}
+          />
+        </View>
+      </Modal>
     );
   }
 

@@ -95,7 +95,7 @@ export default function OrderViewDialog({
             <Grid item xs={12} sm={6}>
               <Typography variant="body2" sx={{ color: '#666' }}>Status</Typography>
               <Chip
-                label={currentStatus.replace(/_/g, ' ').toUpperCase()}
+                label={(currentStatus || 'pending').replace(/_/g, ' ').toUpperCase()}
                 color={statusColors[currentStatus] || 'default'}
                 size="small"
               />
@@ -259,7 +259,7 @@ export default function OrderViewDialog({
                 >
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <Typography variant="body1" fontWeight={600}>
-                      {update.status?.replace(/_/g, ' ').toUpperCase()}
+                      {(update.status || 'pending').replace(/_/g, ' ').toUpperCase()}
                     </Typography>
                     <Typography variant="caption" sx={{ color: '#666' }}>
                       {formatDate(update.timestamp)}
@@ -278,7 +278,7 @@ export default function OrderViewDialog({
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <Typography variant="h6" fontWeight={700} sx={{ color: '#1E1B4B' }}>Total Amount</Typography>
             <Typography variant="h5" fontWeight={700} sx={{ color: '#1E1B4B' }}>
-              ₹{(order.totalAmount || order.orderSummary?.totalAmount || 0).toLocaleString('en-IN')}
+              ₹{Number(order.totalAmount || order.orderSummary?.totalAmount || 0).toLocaleString('en-IN')}
             </Typography>
           </Box>
         </Box>

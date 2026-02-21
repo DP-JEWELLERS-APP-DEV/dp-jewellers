@@ -1,4 +1,4 @@
-package com.render.rnexpo_jewelleryempire
+package com.dpjewellers.app
 
 import android.app.Application
 import android.content.res.Configuration
