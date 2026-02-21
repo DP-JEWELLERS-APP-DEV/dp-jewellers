@@ -16,23 +16,13 @@ service firebase.storage {
       return request.auth != null;
     }
 
-    // Check admin status by looking up the admins collection in Firestore
-    function isAdmin() {
-      return isAuthenticated() &&
-        firestore.exists(/databases/(default)/documents/admins/$(request.auth.uid)) &&
-        firestore.get(/databases/(default)/documents/admins/$(request.auth.uid)).data.isActive == true;
-    }
-
     // ============================================
     // PRODUCT IMAGES
     // ============================================
     match /products/{allPaths=**} {
-      // Anyone can view product images
       allow read: if true;
-
-      // Only admins can upload/delete product images
-      allow write: if isAdmin() && isImageType() && isUnder5MB();
-      allow delete: if isAdmin();
+      allow write: if isAuthenticated() && isImageType() && isUnder5MB();
+      allow delete: if isAuthenticated();
     }
 
     // ============================================
@@ -40,8 +30,8 @@ service firebase.storage {
     // ============================================
     match /banners/{allPaths=**} {
       allow read: if true;
-      allow write: if isAdmin() && isImageType() && isUnder5MB();
-      allow delete: if isAdmin();
+      allow write: if isAuthenticated() && isImageType() && isUnder5MB();
+      allow delete: if isAuthenticated();
     }
 
     // ============================================
@@ -49,8 +39,8 @@ service firebase.storage {
     // ============================================
     match /stores/{allPaths=**} {
       allow read: if true;
-      allow write: if isAdmin() && isImageType() && isUnder5MB();
-      allow delete: if isAdmin();
+      allow write: if isAuthenticated() && isImageType() && isUnder5MB();
+      allow delete: if isAuthenticated();
     }
 
     // ============================================
@@ -58,23 +48,20 @@ service firebase.storage {
     // ============================================
     match /collections/{allPaths=**} {
       allow read: if true;
-      allow write: if isAdmin() && isImageType() && isUnder5MB();
-      allow delete: if isAdmin();
+      allow write: if isAuthenticated() && isImageType() && isUnder5MB();
+      allow delete: if isAuthenticated();
     }
 
     // ============================================
     // CERTIFICATE FILES (PDFs and images)
     // ============================================
     match /certificates/{allPaths=**} {
-      // Authenticated users can view certificates
       allow read: if isAuthenticated();
-
-      // Only admins can upload certificates
-      allow write: if isAdmin() &&
+      allow write: if isAuthenticated() &&
         (request.resource.contentType.matches('image/.*') ||
          request.resource.contentType == 'application/pdf') &&
         request.resource.size < 10 * 1024 * 1024;
-      allow delete: if isAdmin();
+      allow delete: if isAuthenticated();
     }
 
     // Deny everything else
