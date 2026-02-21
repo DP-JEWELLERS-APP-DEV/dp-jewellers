@@ -369,7 +369,8 @@ export default function ProductsPage() {
     const uploadedImages = [];
     for (const file of imageFiles) {
       const storageRef = ref(storage, `products/${Date.now()}_${file.name}`);
-      await uploadBytes(storageRef, file);
+      const metadata = { contentType: file.type || 'image/jpeg' };
+      await uploadBytes(storageRef, file, metadata);
       const url = await getDownloadURL(storageRef);
       uploadedImages.push({ url, caption: '', alt: file.name });
     }

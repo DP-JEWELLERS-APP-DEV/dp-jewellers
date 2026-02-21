@@ -46,6 +46,11 @@ export default function OrderViewDialog({
   const isPickup = order.deliveryType === 'pickup' || order.deliveryType === 'store_pickup';
   const currentStatus = order.status || order.orderStatus || 'pending';
 
+  const totalAmount = order.totalAmount || order.orderSummary?.totalAmount || 0;
+  const isPaidViaGateway = order.paymentStatus === 'paid' || order.paymentStatus === 'SUCCESS' || order.paymentStatus === 'completed' || order.paymentId;
+  const amountPaid = order.partialPayment?.isPartialPayment ? (order.partialPayment.amountPaid || 0) : (isPaidViaGateway ? totalAmount : 0);
+  const balanceDue = Math.max(0, totalAmount - amountPaid);
+
   return (
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
       <DialogTitle sx={{ color: '#1E1B4B', fontWeight: 'bold' }}>
@@ -95,7 +100,7 @@ export default function OrderViewDialog({
             <Grid item xs={12} sm={6}>
               <Typography variant="body2" sx={{ color: '#666' }}>Status</Typography>
               <Chip
-                label={currentStatus.replace(/_/g, ' ').toUpperCase()}
+                label={(currentStatus || 'pending').replace(/_/g, ' ').toUpperCase()}
                 color={statusColors[currentStatus] || 'default'}
                 size="small"
               />
@@ -134,10 +139,10 @@ export default function OrderViewDialog({
             {isPickup && (
               <Grid item xs={12}>
                 <Typography variant="body2" sx={{ color: '#666' }}>Pickup Store</Typography>
-                <Typography variant="body1" fontWeight={600}>{getStoreName(order.selectedStore)}</Typography>
-                {getStoreAddress(order.selectedStore) && (
+                <Typography variant="body1" fontWeight={600}>{getStoreName(order.selectedStore?.storeId || order.selectedStore)}</Typography>
+                {getStoreAddress(order.selectedStore?.storeId || order.selectedStore) && (
                   <Typography variant="body2" sx={{ color: '#666', mt: 0.5 }}>
-                    {getStoreAddress(order.selectedStore)}
+                    {getStoreAddress(order.selectedStore?.storeId || order.selectedStore)}
                   </Typography>
                 )}
               </Grid>
@@ -259,7 +264,7 @@ export default function OrderViewDialog({
                 >
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <Typography variant="body1" fontWeight={600}>
-                      {update.status?.replace(/_/g, ' ').toUpperCase()}
+                      {(update.status || 'pending').replace(/_/g, ' ').toUpperCase()}
                     </Typography>
                     <Typography variant="caption" sx={{ color: '#666' }}>
                       {formatDate(update.timestamp)}
@@ -275,10 +280,22 @@ export default function OrderViewDialog({
 
           {/* ── Grand Total ── */}
           <Divider sx={{ my: 3 }} />
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+            <Typography variant="subtitle1" fontWeight={700} sx={{ color: '#1E1B4B' }}>Total Amount</Typography>
+            <Typography variant="subtitle1" fontWeight={700} sx={{ color: '#1E1B4B' }}>
+              ₹{Number(totalAmount).toLocaleString('en-IN')}
+            </Typography>
+          </Box>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+            <Typography variant="body1" fontWeight={600} sx={{ color: '#4CAF50' }}>Amount Paid</Typography>
+            <Typography variant="body1" fontWeight={600} sx={{ color: '#4CAF50' }}>
+              ₹{Number(amountPaid).toLocaleString('en-IN')}
+            </Typography>
+          </Box>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Typography variant="h6" fontWeight={700} sx={{ color: '#1E1B4B' }}>Total Amount</Typography>
-            <Typography variant="h5" fontWeight={700} sx={{ color: '#1E1B4B' }}>
-              ₹{(order.totalAmount || order.orderSummary?.totalAmount || 0).toLocaleString('en-IN')}
+            <Typography variant="body1" fontWeight={600} sx={{ color: '#D32F2F' }}>Balance Due</Typography>
+            <Typography variant="body1" fontWeight={600} sx={{ color: '#D32F2F' }}>
+              ₹{Number(balanceDue).toLocaleString('en-IN')}
             </Typography>
           </Box>
         </Box>

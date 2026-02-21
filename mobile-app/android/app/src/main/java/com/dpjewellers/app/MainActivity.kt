@@ -1,4 +1,4 @@
-package com.render.rnexpo_jewelleryempire
+package com.dpjewellers.app
 import expo.modules.splashscreen.SplashScreenManager
 
 import android.os.Build

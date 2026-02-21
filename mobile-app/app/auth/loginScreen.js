@@ -58,13 +58,17 @@ const LoginScreen = () => {
         seterrorText('');
         try {
             const verificationId = await recaptchaVerifier.current.sendOtp(normalized);
+            if (!verificationId) {
+                throw new Error("Failed to get verification ID from Firebase");
+            }
             navigation.push('auth/verificationScreen', {
                 verificationId,
                 phoneNumber: normalized,
                 mode: 'login',
             });
         } catch (err) {
-            seterrorText('Failed to send OTP. Please try again.');
+            console.error('OTP Send Error:', err);
+            seterrorText(err?.message || 'Failed to send OTP. Please try again.');
         } finally {
             setloading(false);
         }

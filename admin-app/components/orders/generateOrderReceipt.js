@@ -8,8 +8,13 @@ export function generateOrderReceipt(order, { getStoreName, getStoreAddress, for
   const storeName = isPickup ? getStoreName(order.selectedStore?.storeId || order.selectedStore) : null;
   const storeAddress = isPickup ? getStoreAddress(order.selectedStore?.storeId || order.selectedStore) : null;
   const orderDate = formatDate(order.createdAt || order.orderedAt);
-  const totalAmount = (order.totalAmount || order.orderSummary?.totalAmount || 0).toLocaleString('en-IN');
+  const totalAmountNum = order.totalAmount || order.orderSummary?.totalAmount || 0;
+  const totalAmount = totalAmountNum.toLocaleString('en-IN');
   const logoUrl = window.location.origin + '/dp-logo-02.png';
+
+  const isPaidViaGateway = order.paymentStatus === 'paid' || order.paymentStatus === 'SUCCESS' || order.paymentStatus === 'completed' || order.paymentId;
+  const amountPaidNum = order.partialPayment?.isPartialPayment ? (order.partialPayment.amountPaid || 0) : (isPaidViaGateway ? totalAmountNum : 0);
+  const balanceDueNum = Math.max(0, totalAmountNum - amountPaidNum);
 
   const itemsHtml = (order.items || []).map((item, idx) => {
     const snap = item.priceSnapshot || {};
@@ -49,12 +54,11 @@ export function generateOrderReceipt(order, { getStoreName, getStoreAddress, for
        <tr><td>Gateway</td><td>${order.paymentGateway || 'Razorpay'}</td></tr>`
     : '';
 
-  const partialHtml = order.partialPayment?.isPartialPayment
-    ? `<table style="margin-top:8px">
-        <tr><td>Amount Paid Now</td><td>₹${Number(order.partialPayment.amountPaid || 0).toLocaleString('en-IN')}</td></tr>
-        <tr><td>Amount Due at ${isPickup ? 'Pickup' : 'Delivery'}</td><td>₹${Number(order.partialPayment.amountRemaining || 0).toLocaleString('en-IN')}</td></tr>
-      </table>`
-    : '';
+  const paymentTotalsHtml = `
+      <table style="margin-top:8px">
+        <tr><td>Amount Paid</td><td style="color: #4CAF50; font-weight: bold;">₹${Number(amountPaidNum).toLocaleString('en-IN')}</td></tr>
+        <tr><td>Balance Due</td><td style="color: #D32F2F; font-weight: bold;">₹${Number(balanceDueNum).toLocaleString('en-IN')}</td></tr>
+      </table>`;
 
   const html = `<!DOCTYPE html>
 <html>
@@ -88,7 +92,6 @@ export function generateOrderReceipt(order, { getStoreName, getStoreAddress, for
 <body>
   <div class="header">
     <img src="${logoUrl}" alt="DP Jewellers" onerror="this.style.display='none'" />
-    <h1>DP JEWELLERS</h1>
     <p>Pure Since 1941 &nbsp;|&nbsp; Ballia, Uttar Pradesh</p>
   </div>
   <div class="receipt-title">Order Receipt</div>
@@ -128,11 +131,11 @@ export function generateOrderReceipt(order, { getStoreName, getStoreAddress, for
       <span>Total Amount</span>
       <span>₹${totalAmount}</span>
     </div>
-    ${partialHtml}
+    ${paymentTotalsHtml}
   </section>
 
   <div class="disclaimer">
-    ⚠️ This is a digital copy of your order confirmation only.<br/>
+    This is a digital copy of your order confirmation only.<br/>
     <strong>This is NOT an original receipt.</strong><br/>
     The original receipt / invoice will be provided by the store at the time of delivery or pickup.
   </div>

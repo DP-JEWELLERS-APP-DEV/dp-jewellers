@@ -42,11 +42,15 @@ export default function OrderListView({
       aValue = (a.userName || '').toLowerCase();
       bValue = (b.userName || '').toLowerCase();
     } else if (sortConfig.key === 'createdAt') {
-      aValue = a.createdAt || a.orderedAt ? new Date(a.createdAt || a.orderedAt).getTime() : 0;
-      bValue = b.createdAt || b.orderedAt ? new Date(b.createdAt || b.orderedAt).getTime() : 0;
+      const aTime = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : a.createdAt ? new Date(a.createdAt).getTime() : 
+                    a.orderedAt?.toDate ? a.orderedAt.toDate().getTime() : a.orderedAt ? new Date(a.orderedAt).getTime() : 0;
+      const bTime = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : b.createdAt ? new Date(b.createdAt).getTime() : 
+                    b.orderedAt?.toDate ? b.orderedAt.toDate().getTime() : b.orderedAt ? new Date(b.orderedAt).getTime() : 0;
+      aValue = aTime;
+      bValue = bTime;
     } else if (sortConfig.key === 'estimatedDeliveryDate') {
-      aValue = a.estimatedDeliveryDate ? new Date(a.estimatedDeliveryDate).getTime() : 0;
-      bValue = b.estimatedDeliveryDate ? new Date(b.estimatedDeliveryDate).getTime() : 0;
+      aValue = a.estimatedDeliveryDate?.toDate ? a.estimatedDeliveryDate.toDate().getTime() : a.estimatedDeliveryDate ? new Date(a.estimatedDeliveryDate).getTime() : 0;
+      bValue = b.estimatedDeliveryDate?.toDate ? b.estimatedDeliveryDate.toDate().getTime() : b.estimatedDeliveryDate ? new Date(b.estimatedDeliveryDate).getTime() : 0;
     } else if (sortConfig.key === 'totalAmount') {
       aValue = a.totalAmount || a.orderSummary?.totalAmount || 0;
       bValue = b.totalAmount || b.orderSummary?.totalAmount || 0;
@@ -119,7 +123,7 @@ export default function OrderListView({
               const amount = order.totalAmount || order.orderSummary?.totalAmount || 0;
               const date = order.createdAt || order.orderedAt;
               const isPickup = order.deliveryType === 'pickup' || order.deliveryType === 'store_pickup';
-              const s = order.status || order.orderStatus || 'pending';
+              const s = (order.status || order.orderStatus || 'pending').toLowerCase();
               const colorTheme = statusColors[s] || { bg: '#f1f5f9', text: '#475569', dot: '#94a3b8' };
 
               return (
@@ -159,7 +163,7 @@ export default function OrderListView({
                   {/* Amount */}
                   <td style={{ padding: '16px', verticalAlign: 'middle' }}>
                     <div style={{ fontSize: 14, fontWeight: 700, color: '#1E1B4B' }}>
-                      ₹{amount.toLocaleString('en-IN')}
+                      ₹{Number(amount || 0).toLocaleString('en-IN')}
                     </div>
                   </td>
 
