@@ -134,10 +134,10 @@ export default function OrderViewDialog({
             {isPickup && (
               <Grid item xs={12}>
                 <Typography variant="body2" sx={{ color: '#666' }}>Pickup Store</Typography>
-                <Typography variant="body1" fontWeight={600}>{getStoreName(order.selectedStore)}</Typography>
-                {getStoreAddress(order.selectedStore) && (
+                <Typography variant="body1" fontWeight={600}>{getStoreName(order.selectedStore?.storeId || order.selectedStore)}</Typography>
+                {getStoreAddress(order.selectedStore?.storeId || order.selectedStore) && (
                   <Typography variant="body2" sx={{ color: '#666', mt: 0.5 }}>
-                    {getStoreAddress(order.selectedStore)}
+                    {getStoreAddress(order.selectedStore?.storeId || order.selectedStore)}
                   </Typography>
                 )}
               </Grid>
