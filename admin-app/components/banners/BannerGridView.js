@@ -25,6 +25,7 @@ export default function BannerGridView({ banners, customCollections, onEdit, onD
               transition: 'all 0.2s ease-in-out',
               display: 'flex',
               flexDirection: 'column',
+              height: '100%',
               boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
               '&:hover': {
                 transform: 'translateY(-2px)',
@@ -108,8 +109,8 @@ export default function BannerGridView({ banners, customCollections, onEdit, onD
             </div>
 
             {/* Content Details */}
-            <div style={{ padding: '16px' }}>
-              <div style={{ fontSize: 15, fontWeight: 700, color: '#1E1B4B', lineHeight: 1.3, marginBottom: 8, overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+            <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', flex: 1 }}>
+              <div style={{ fontSize: 15, fontWeight: 700, color: '#1E1B4B', lineHeight: 1.3, marginBottom: 8, overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', flex: 1 }}>
                 {banner.title}
               </div>
 

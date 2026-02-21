@@ -17,10 +17,10 @@ import {
   Alert,
   Box,
   Divider,
-  Tooltip,
+  InputAdornment,
 } from '@mui/material';
-import { DataGrid, GridToolbar } from '@mui/x-data-grid';
-import { Visibility, Edit, Delete, Block, CheckCircle } from '@mui/icons-material';
+import { Visibility, Edit, Delete, Block, CheckCircle, Search } from '@mui/icons-material';
+import UserListView from '@/components/users/UserListView';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import app from '@/lib/firebase';
 
@@ -35,6 +35,7 @@ export default function UsersPage() {
   const [success, setSuccess] = useState('');
   const [error, setError] = useState('');
   const [userOrders, setUserOrders] = useState([]);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const [editFormData, setEditFormData] = useState({
     name: '',
@@ -165,7 +166,17 @@ export default function UsersPage() {
     );
   
     return date.toLocaleDateString();
-  };  
+  };
+
+  const filteredUsers = users.filter(user => {
+    if (!searchQuery) return true;
+    const lowerQuery = searchQuery.toLowerCase();
+    return (
+      (user.name && user.name.toLowerCase().includes(lowerQuery)) ||
+      (user.email && user.email.toLowerCase().includes(lowerQuery)) ||
+      (user.phone && user.phone.includes(lowerQuery))
+    );
+  });
 
   return (
     <div>
@@ -176,95 +187,43 @@ export default function UsersPage() {
       {success && <Alert severity="success" className="!mb-4" onClose={() => setSuccess('')}>{success}</Alert>}
       {error && <Alert severity="error" className="!mb-4" onClose={() => setError('')}>{error}</Alert>}
 
-      <Paper elevation={2} sx={{ backgroundColor: 'white', borderRadius: 2 }}>
-        <DataGrid
-          rows={users}
-          columns={[
-            { field: 'name', headerName: 'Name', flex: 1, minWidth: 150, sortable: true, valueGetter: (value, row) => row.name || 'N/A' },
-            { field: 'email', headerName: 'Email', flex: 1, minWidth: 180, sortable: true, valueGetter: (value, row) => row.email || 'N/A' },
-            { field: 'phone', headerName: 'Phone', width: 130, sortable: true, valueGetter: (value, row) => row.phone || 'N/A' },
-            {
-              field: 'createdAt',
-              headerName: 'Joined Date',
-              width: 130,
-              sortable: true,
-              valueGetter: (value, row) => row.createdAt ? new Date(row.createdAt) : null,
-              renderCell: (params) => formatDate(params.row.createdAt),
-            },
-            {
-              field: 'isActive',
-              headerName: 'Status',
-              width: 100,
-              sortable: true,
-              renderCell: (params) => (
-                <Chip
-                  label={params.row.isActive !== false ? 'Active' : 'Inactive'}
-                  color={params.row.isActive !== false ? 'success' : 'default'}
-                  size="small"
-                />
-              ),
-            },
-            {
-              field: 'actions',
-              headerName: 'Actions',
-              width: 180,
-              sortable: false,
-              filterable: false,
-              renderCell: (params) => (
-                <>
-                  <Tooltip title="View user profile and order history" arrow>
-                    <IconButton size="small" onClick={() => handleViewUser(params.row)} sx={{ color: '#1E1B4B', mr: 0.5 }}>
-                      <Visibility fontSize="small" />
-                    </IconButton>
-                  </Tooltip>
-                  <Tooltip title="Edit user details (name, email, phone, address)" arrow>
-                    <IconButton size="small" onClick={() => handleEditUser(params.row)} sx={{ color: '#1E1B4B', mr: 0.5 }}>
-                      <Edit fontSize="small" />
-                    </IconButton>
-                  </Tooltip>
-                  <Tooltip title={params.row.isActive !== false ? 'Deactivate: User will not be able to login or place orders' : 'Activate: Restore user access to the app'} arrow>
-                    <IconButton
-                      size="small"
-                      onClick={() => handleToggleUserStatus(params.row)}
-                      sx={{ color: params.row.isActive !== false ? '#FF9800' : '#4CAF50', mr: 0.5 }}
-                    >
-                      {params.row.isActive !== false ? <Block fontSize="small" /> : <CheckCircle fontSize="small" />}
-                    </IconButton>
-                  </Tooltip>
-                  <Tooltip title="Deactivate user account (soft delete)" arrow>
-                    <IconButton size="small" onClick={() => handleDeleteUser(params.row.id)} sx={{ color: '#d32f2f' }}>
-                      <Delete fontSize="small" />
-                    </IconButton>
-                  </Tooltip>
-                </>
-              ),
-            },
-          ]}
-          getRowId={(row) => row.id}
-          loading={loading && users.length === 0}
-          initialState={{
-            pagination: { paginationModel: { pageSize: 10 } },
-            sorting: { sortModel: [{ field: 'createdAt', sort: 'desc' }] },
+      <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #EBEBEB', padding: '16px', marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <TextField
+          placeholder="Search by name, email, or phone..."
+          variant="outlined"
+          size="small"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <Search sx={{ color: '#888' }} />
+              </InputAdornment>
+            ),
           }}
-          pageSizeOptions={[10, 25, 50]}
-          slots={{ toolbar: GridToolbar }}
-          slotProps={{
-            toolbar: {
-              showQuickFilter: true,
-              quickFilterProps: { debounceMs: 500 },
-            },
-          }}
-          disableRowSelectionOnClick
-          autoHeight
           sx={{
-            border: 'none',
-            '& .MuiDataGrid-columnHeaders': { backgroundColor: '#f5f5f5', fontWeight: 'bold' },
-            '& .MuiDataGrid-row:hover': { backgroundColor: '#f9f9f9' },
-            '& .MuiDataGrid-toolbarContainer': { p: 2, gap: 2 },
+            width: 320,
+            '& .MuiOutlinedInput-root': {
+              background: '#FAFAF8',
+              borderRadius: '8px',
+              '& fieldset': { borderColor: '#EBEBEB' },
+              '&:hover fieldset': { borderColor: '#1E1B4B' },
+              '&.Mui-focused fieldset': { borderColor: '#1E1B4B' },
+            }
           }}
-          localeText={{ noRowsLabel: 'No users found' }}
         />
-      </Paper>
+        <Typography variant="body2" sx={{ color: '#666', fontWeight: 500 }}>
+          {filteredUsers.length} user{filteredUsers.length !== 1 ? 's' : ''} found
+        </Typography>
+      </div>
+
+      <UserListView
+        users={filteredUsers}
+        onViewUser={handleViewUser}
+        onEditUser={handleEditUser}
+        onToggleStatus={handleToggleUserStatus}
+        onDeleteUser={handleDeleteUser}
+      />
 
       {/* View User Dialog */}
       <Dialog

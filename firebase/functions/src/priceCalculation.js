@@ -242,7 +242,7 @@ function calculateVariantPriceInternal(product, rates, taxSettings, makingCharge
   // Determine weight for the configurable metal from size or base weight
   let configurableNetWeight = variant.netWeight || 0;
   if (selectedSize && variant.sizes && variant.sizes.length > 0) {
-    const sizeEntry = variant.sizes.find((s) => s.size === selectedSize);
+    const sizeEntry = variant.sizes.find((s) => String(s.size) === String(selectedSize));
     if (sizeEntry) {
       configurableNetWeight = sizeEntry.netWeight || configurableNetWeight;
     }
@@ -269,7 +269,7 @@ function calculateVariantPriceInternal(product, rates, taxSettings, makingCharge
   for (const fm of fixedMetals) {
     const fmRate = getMetalRate(fm.type, fm.purity, rates);
     const sizeRow = selectedSize && fm.sizes?.length > 0
-      ? fm.sizes.find((s) => s.size === selectedSize)
+      ? fm.sizes.find((s) => String(s.size) === String(selectedSize))
       : null;
     const fmNetWeight = Number(sizeRow?.netWeight ?? fm.netWeight) || 0;
     const fmValue = fmNetWeight * fmRate;

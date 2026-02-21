@@ -17,8 +17,8 @@ import {
   DialogContent,
   DialogActions,
 } from '@mui/material';
-import { DataGrid, GridToolbar } from '@mui/x-data-grid';
 import { FileDownload, FilterList, Clear } from '@mui/icons-material';
+import ActivityLogListView from '@/components/activity-log/ActivityLogListView';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import app from '@/lib/firebase';
 import * as XLSX from 'xlsx';
@@ -194,113 +194,6 @@ export default function ActivityLogPage() {
     setSuccess('Exported successfully!');
   };
 
-  const columns = [
-    {
-      field: 'action',
-      headerName: 'Action',
-      width: 140,
-      renderCell: (params) => (
-        <Chip
-          label={params.value?.replace(/([A-Z])/g, ' $1').trim() || 'N/A'}
-          color={actionColors[params.value] || 'default'}
-          size="small"
-          variant="outlined"
-          sx={{ textTransform: 'capitalize' }}
-        />
-      ),
-    },
-    {
-      field: 'module',
-      headerName: 'Module',
-      width: 130,
-      renderCell: (params) => (
-        <Chip
-          label={moduleLabels[params.value] || params.value || 'N/A'}
-          color={moduleColors[params.value] || 'default'}
-          size="small"
-        />
-      ),
-    },
-    {
-      field: 'entityName',
-      headerName: 'Entity',
-      flex: 1,
-      minWidth: 200,
-      renderCell: (params) => (
-        <Box>
-          <Typography variant="body2" noWrap>
-            {params.value || 'N/A'}
-          </Typography>
-          <Typography variant="caption" sx={{ color: '#999' }} noWrap>
-            {params.row.entityId || ''}
-          </Typography>
-        </Box>
-      ),
-    },
-    {
-      field: 'status',
-      headerName: 'Status',
-      width: 100,
-      renderCell: (params) => (
-        <Chip
-          label={params.value || 'N/A'}
-          color={params.value === 'success' ? 'success' : 'error'}
-          size="small"
-        />
-      ),
-    },
-    {
-      field: 'performedByEmail',
-      headerName: 'Performed By',
-      flex: 1,
-      minWidth: 200,
-      renderCell: (params) => (
-        <Box>
-          <Typography variant="body2" noWrap>
-            {params.value || 'N/A'}
-          </Typography>
-          <Typography variant="caption" sx={{ color: '#999', textTransform: 'capitalize' }}>
-            {params.row.performedByRole?.replace('_', ' ') || ''}
-          </Typography>
-        </Box>
-      ),
-    },
-    {
-      field: 'timestamp',
-      headerName: 'Date/Time',
-      width: 180,
-      valueGetter: (value, row) =>
-        row.timestamp?._seconds
-          ? new Date(row.timestamp._seconds * 1000)
-          : row.timestamp?.seconds
-            ? new Date(row.timestamp.seconds * 1000)
-            : null,
-      renderCell: (params) => (
-        <Typography variant="body2">
-          {formatTimestamp(params.row.timestamp)}
-        </Typography>
-      ),
-    },
-    {
-      field: 'details',
-      headerName: 'Details',
-      width: 120,
-      sortable: false,
-      renderCell: (params) => {
-        const details = params.value;
-        if (!details || Object.keys(details).length === 0) return '-';
-        return (
-          <Button
-            size="small"
-            sx={{ textTransform: 'none', color: '#1E1B4B' }}
-            onClick={() => setDetailsDialog({ open: true, details })}
-          >
-            View
-          </Button>
-        );
-      },
-    },
-  ];
 
   if (loading && logs.length === 0) {
     return (
@@ -403,45 +296,11 @@ export default function ActivityLogPage() {
         </Box>
       </Paper>
 
-      {/* Data Table */}
-      <Paper sx={{ width: '100%' }}>
-        <DataGrid
-          rows={logs}
-          columns={columns}
-          getRowId={(row) => row.id}
-          loading={loading}
-          initialState={{
-            pagination: { paginationModel: { pageSize: 25 } },
-            sorting: { sortModel: [{ field: 'timestamp', sort: 'desc' }] },
-          }}
-          pageSizeOptions={[10, 25, 50, 100]}
-          slots={{ toolbar: GridToolbar }}
-          slotProps={{
-            toolbar: {
-              showQuickFilter: true,
-              quickFilterProps: { debounceMs: 500 },
-            },
-          }}
-          disableRowSelectionOnClick
-          autoHeight
-          rowHeight={60}
-          sx={{
-            border: 'none',
-            '& .MuiDataGrid-columnHeaders': {
-              backgroundColor: '#f5f5f5',
-              fontWeight: 'bold',
-            },
-            '& .MuiDataGrid-row:hover': {
-              backgroundColor: '#f9f9f9',
-            },
-            '& .MuiDataGrid-toolbarContainer': {
-              p: 2,
-              gap: 2,
-            },
-          }}
-          localeText={{ noRowsLabel: 'No activity logs found' }}
-        />
-      </Paper>
+      {/* Data List */}
+      <ActivityLogListView
+        logs={logs}
+        onViewDetails={(details) => setDetailsDialog({ open: true, details })}
+      />
 
       {/* Details Dialog */}
       <Dialog

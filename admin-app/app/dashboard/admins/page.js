@@ -22,9 +22,10 @@ import {
   FormGroup,
   Tooltip,
   Divider,
+  InputAdornment,
 } from '@mui/material';
-import { DataGrid, GridToolbar } from '@mui/x-data-grid';
-import { Edit, Block, CheckCircle, PersonAdd } from '@mui/icons-material';
+import { Edit, Block, CheckCircle, PersonAdd, Search } from '@mui/icons-material';
+import AdminListView from '@/components/admins/AdminListView';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import app from '@/lib/firebase';
 
@@ -42,17 +43,6 @@ const buttonSx = {
   backgroundColor: '#1E1B4B',
   '&:hover': { backgroundColor: '#2D2963' },
   textTransform: 'none',
-};
-
-const getRoleChipColor = (role) => {
-  switch (role) {
-    case 'super_admin':
-      return 'primary';
-    case 'admin':
-      return 'info';
-    default:
-      return 'default';
-  }
 };
 
 const formatRoleLabel = (role) => {
@@ -74,6 +64,7 @@ export default function AdminsPage() {
   const [actionLoading, setActionLoading] = useState(false);
   const [success, setSuccess] = useState('');
   const [error, setError] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Create admin dialog
   const [openCreateDialog, setOpenCreateDialog] = useState(false);
@@ -231,23 +222,15 @@ export default function AdminsPage() {
     }));
   };
 
-  const formatDate = (timestamp) => {
-    if (!timestamp || !timestamp._seconds) return '';
-  
-    const date = new Date(
-      timestamp._seconds * 1000 + timestamp._nanoseconds / 1e6
-    );
-  
-    return date.toLocaleDateString();
-  };  
 
-  const formatPermissions = (permissions) => {
-    if (!permissions) return 'None';
-    const activePermissions = PERMISSION_OPTIONS
-      .filter((p) => permissions[p.key])
-      .map((p) => p.label);
-    return activePermissions.length > 0 ? activePermissions.join(', ') : 'None';
-  };
+  const filteredAdmins = admins.filter(admin => {
+    if (!searchQuery) return true;
+    const lowerQuery = searchQuery.toLowerCase();
+    return (
+      (admin.email && admin.email.toLowerCase().includes(lowerQuery)) ||
+      (admin.role && formatRoleLabel(admin.role).toLowerCase().includes(lowerQuery))
+    );
+  });
 
   if (loading) {
     return (
@@ -284,136 +267,43 @@ export default function AdminsPage() {
         </Alert>
       )}
 
-      <Paper elevation={2} sx={{ backgroundColor: 'white', borderRadius: 2 }}>
-        <DataGrid
-          rows={admins}
-          columns={[
-            { field: 'email', headerName: 'Email', flex: 1, minWidth: 200, sortable: true },
-            {
-              field: 'role',
-              headerName: 'Role',
-              width: 130,
-              sortable: true,
-              renderCell: (params) => (
-                <Chip
-                  label={formatRoleLabel(params.row.role)}
-                  color={getRoleChipColor(params.row.role)}
-                  size="small"
-                />
-              ),
-            },
-            {
-              field: 'isActive',
-              headerName: 'Status',
-              width: 100,
-              sortable: true,
-              renderCell: (params) => (
-                <Chip
-                  label={params.row.isActive ? 'Active' : 'Inactive'}
-                  color={params.row.isActive ? 'success' : 'default'}
-                  size="small"
-                />
-              ),
-            },
-            {
-              field: 'permissions',
-              headerName: 'Permissions',
-              flex: 1,
-              minWidth: 180,
-              sortable: false,
-              valueGetter: (value, row) => row.role === 'super_admin' ? 'All permissions' : formatPermissions(row.permissions),
-              renderCell: (params) => (
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                  <Typography variant="body2" noWrap>
-                    {params.row.role === 'super_admin' ? 'All permissions' : formatPermissions(params.row.permissions)}
-                  </Typography>
-                  {params.row.skipApproval && params.row.role !== 'super_admin' && (
-                    <Chip label="Auto-approve" size="small" color="warning" variant="outlined" />
-                  )}
-                </Box>
-              ),
-            },
-            {
-              field: 'createdAt',
-              headerName: 'Created',
-              width: 120,
-              sortable: true,
-              valueGetter: (value, row) => row.createdAt?._seconds ? new Date(row.createdAt._seconds * 1000) : null,
-              renderCell: (params) => formatDate(params.row.createdAt),
-            },
-            {
-              field: 'actions',
-              headerName: 'Actions',
-              width: 140,
-              sortable: false,
-              filterable: false,
-              renderCell: (params) => (
-                params.row.role === 'super_admin' ? (
-                  <Chip label="Super Admin" size="small" color="primary" variant="outlined" />
-                ) : (
-                  <Box sx={{ display: 'flex', gap: 0.5 }}>
-                    <Tooltip title="Edit admin role and permissions" arrow>
-                      <IconButton
-                        size="small"
-                        onClick={() => handleOpenEditDialog(params.row)}
-                        sx={{ color: '#1E1B4B' }}
-                        disabled={actionLoading}
-                      >
-                        <Edit fontSize="small" />
-                      </IconButton>
-                    </Tooltip>
-                    {params.row.isActive ? (
-                      <Tooltip title="Deactivate: Admin will lose access to the dashboard" arrow>
-                        <IconButton
-                          size="small"
-                          onClick={() => handleDeactivateAdmin(params.row)}
-                          sx={{ color: '#FF9800' }}
-                          disabled={actionLoading}
-                        >
-                          <Block fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                    ) : (
-                      <Tooltip title="Reactivate: Restore admin access to the dashboard" arrow>
-                        <IconButton
-                          size="small"
-                          onClick={() => handleReactivateAdmin(params.row)}
-                          sx={{ color: '#4CAF50' }}
-                          disabled={actionLoading}
-                        >
-                          <CheckCircle fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                    )}
-                  </Box>
-                )
-              ),
-            },
-          ]}
-          getRowId={(row) => row.uid}
-          initialState={{
-            pagination: { paginationModel: { pageSize: 10 } },
-            sorting: { sortModel: [{ field: 'email', sort: 'asc' }] },
+      <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #EBEBEB', padding: '16px', marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <TextField
+          placeholder="Search by email or role..."
+          variant="outlined"
+          size="small"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <Search sx={{ color: '#888' }} />
+              </InputAdornment>
+            ),
           }}
-          pageSizeOptions={[10, 25, 50]}
-          slots={{ toolbar: GridToolbar }}
-          slotProps={{
-            toolbar: {
-              showQuickFilter: true,
-              quickFilterProps: { debounceMs: 500 },
-            },
-          }}
-          disableRowSelectionOnClick
-          autoHeight
           sx={{
-            border: 'none',
-            '& .MuiDataGrid-columnHeaders': { backgroundColor: '#f5f5f5', fontWeight: 'bold' },
-            '& .MuiDataGrid-row:hover': { backgroundColor: '#f9f9f9' },
-            '& .MuiDataGrid-toolbarContainer': { p: 2, gap: 2 },
+            width: 320,
+            '& .MuiOutlinedInput-root': {
+              background: '#FAFAF8',
+              borderRadius: '8px',
+              '& fieldset': { borderColor: '#EBEBEB' },
+              '&:hover fieldset': { borderColor: '#1E1B4B' },
+              '&.Mui-focused fieldset': { borderColor: '#1E1B4B' },
+            }
           }}
-          localeText={{ noRowsLabel: 'No admins found' }}
         />
-      </Paper>
+        <Typography variant="body2" sx={{ color: '#666', fontWeight: 500 }}>
+          {filteredAdmins.length} admin{filteredAdmins.length !== 1 ? 's' : ''} found
+        </Typography>
+      </div>
+
+      <AdminListView
+        admins={filteredAdmins}
+        onEditAdmin={handleOpenEditDialog}
+        onDeactivateAdmin={handleDeactivateAdmin}
+        onReactivateAdmin={handleReactivateAdmin}
+        actionLoading={actionLoading}
+      />
 
       {/* Create Admin Dialog */}
       <Dialog

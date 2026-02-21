@@ -23,9 +23,10 @@ import {
   TableBody,
   TableCell,
   TableRow,
+  InputAdornment,
 } from '@mui/material';
-import { DataGrid, GridToolbar } from '@mui/x-data-grid';
-import { CheckCircle, Cancel, Visibility } from '@mui/icons-material';
+import { CheckCircle, Cancel, Visibility, Search } from '@mui/icons-material';
+import ApprovalListView from '@/components/approvals/ApprovalListView';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import app from '@/lib/firebase';
 
@@ -97,6 +98,7 @@ export default function ApprovalsPage() {
   const [actionLoading, setActionLoading] = useState(false);
   const [success, setSuccess] = useState('');
   const [error, setError] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
   const [filterTab, setFilterTab] = useState(0);
   const [selectedApproval, setSelectedApproval] = useState(null);
   const [openDetailDialog, setOpenDetailDialog] = useState(false);
@@ -326,113 +328,15 @@ export default function ApprovalsPage() {
     );
   };
 
-  const columns = [
-    {
-      field: 'entityType',
-      headerName: 'Type',
-      width: 130,
-      renderCell: (params) => {
-        const { label, color } = getEntityTypeChip(params.value);
-        return <Chip label={label} color={color} size="small" />;
-      },
-    },
-    {
-      field: 'actionType',
-      headerName: 'Action',
-      width: 110,
-      renderCell: (params) => {
-        const { label, color } = getActionTypeChip(params.value);
-        return <Chip label={label} color={color} size="small" variant="outlined" />;
-      },
-    },
-    {
-      field: 'entityName',
-      headerName: 'Name',
-      flex: 1,
-      minWidth: 200,
-    },
-    {
-      field: 'submittedByEmail',
-      headerName: 'Submitted By',
-      flex: 1,
-      minWidth: 180,
-    },
-    {
-      field: 'submittedAt',
-      headerName: 'Date',
-      width: 170,
-      valueGetter: (value, row) =>
-        row.submittedAt?._seconds ? new Date(row.submittedAt._seconds * 1000) : null,
-      renderCell: (params) => formatTimestamp(params.row.submittedAt),
-    },
-    {
-      field: 'status',
-      headerName: 'Status',
-      width: 110,
-      renderCell: (params) => {
-        const { label, color } = getStatusChip(params.value);
-        return <Chip label={label} color={color} size="small" />;
-      },
-    },
-    {
-      field: 'actions',
-      headerName: 'Actions',
-      width: 160,
-      sortable: false,
-      filterable: false,
-      renderCell: (params) => (
-        <Box sx={{ display: 'flex', gap: 0.5 }}>
-          <Tooltip title="View details" arrow>
-            <IconButton
-              size="small"
-              onClick={() => handleOpenDetail(params.row)}
-              sx={{ color: '#1E1B4B' }}
-            >
-              <Visibility fontSize="small" />
-            </IconButton>
-          </Tooltip>
-          {params.row.status === 'pending' && (
-            <>
-              <Tooltip title="Approve" arrow>
-                <IconButton
-                  size="small"
-                  onClick={() => {
-                    setSelectedApproval(params.row);
-                    setReviewNote('');
-                    handleReviewDirect(params.row.id, 'approved');
-                  }}
-                  sx={{ color: '#4CAF50' }}
-                  disabled={actionLoading}
-                >
-                  <CheckCircle fontSize="small" />
-                </IconButton>
-              </Tooltip>
-              <Tooltip title="Reject" arrow>
-                <IconButton
-                  size="small"
-                  onClick={() => handleOpenDetail(params.row)}
-                  sx={{ color: '#f44336' }}
-                  disabled={actionLoading}
-                >
-                  <Cancel fontSize="small" />
-                </IconButton>
-              </Tooltip>
-            </>
-          )}
-        </Box>
-      ),
-    },
-  ];
-
-  // Add review columns for non-pending tabs
-  if (filterTab > 0) {
-    columns.splice(columns.length - 1, 0, {
-      field: 'reviewedByEmail',
-      headerName: 'Reviewed By',
-      flex: 1,
-      minWidth: 150,
-    });
-  }
+  const filteredApprovals = approvals.filter(approval => {
+    if (!searchQuery) return true;
+    const lowerQuery = searchQuery.toLowerCase();
+    return (
+      (approval.entityName && approval.entityName.toLowerCase().includes(lowerQuery)) ||
+      (approval.submittedByEmail && approval.submittedByEmail.toLowerCase().includes(lowerQuery)) ||
+      (approval.entityType && approval.entityType.toLowerCase().includes(lowerQuery))
+    );
+  });
 
   const handleReviewDirect = async (approvalId, decision) => {
     setActionLoading(true);
@@ -495,31 +399,43 @@ export default function ApprovalsPage() {
           <Tab label="Rejected" />
         </Tabs>
 
-        <DataGrid
-          rows={approvals}
-          columns={columns}
-          getRowId={(row) => row.id}
-          initialState={{
-            pagination: { paginationModel: { pageSize: 10 } },
-            sorting: { sortModel: [{ field: 'submittedAt', sort: 'desc' }] },
-          }}
-          pageSizeOptions={[10, 25, 50]}
-          slots={{ toolbar: GridToolbar }}
-          slotProps={{
-            toolbar: {
-              showQuickFilter: true,
-              quickFilterProps: { debounceMs: 500 },
-            },
-          }}
-          disableRowSelectionOnClick
-          autoHeight
-          sx={{
-            border: 'none',
-            '& .MuiDataGrid-columnHeaders': { backgroundColor: '#f5f5f5', fontWeight: 'bold' },
-            '& .MuiDataGrid-row:hover': { backgroundColor: '#f9f9f9' },
-            '& .MuiDataGrid-toolbarContainer': { p: 2, gap: 2 },
-          }}
-          localeText={{ noRowsLabel: 'No approvals found' }}
+        <div style={{ padding: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #EBEBEB' }}>
+          <TextField
+            placeholder="Search by name, submitter, or type..."
+            variant="outlined"
+            size="small"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <Search sx={{ color: '#888' }} />
+                </InputAdornment>
+              ),
+            }}
+            sx={{
+              width: 320,
+              '& .MuiOutlinedInput-root': {
+                background: '#FAFAF8',
+                borderRadius: '8px',
+                '& fieldset': { borderColor: '#EBEBEB' },
+                '&:hover fieldset': { borderColor: '#1E1B4B' },
+                '&.Mui-focused fieldset': { borderColor: '#1E1B4B' },
+              }
+            }}
+          />
+          <Typography variant="body2" sx={{ color: '#666', fontWeight: 500 }}>
+            {filteredApprovals.length} approval{filteredApprovals.length !== 1 ? 's' : ''} found
+          </Typography>
+        </div>
+
+        <ApprovalListView
+          approvals={filteredApprovals}
+          activeTab={filterTab}
+          onViewDetail={handleOpenDetail}
+          onApprove={(id) => handleReviewDirect(id, 'approved')}
+          onReject={(approval) => handleOpenDetail(approval)}
+          actionLoading={actionLoading}
         />
       </Paper>
 

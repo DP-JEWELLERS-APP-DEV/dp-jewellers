@@ -1,6 +1,6 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
-const { _calculateVariantPriceInternal, _normalizeConfigurator } = require("./priceCalculation");
+const { _calculateVariantPriceInternal } = require("./priceCalculation");
 
 const db = admin.firestore();
 const USERS = "users";
@@ -280,7 +280,7 @@ exports.updateCart = onCall({ region: "asia-south1" }, async (request) => {
   // Match cart items by productId + size + variant selections
   const matchCartItem = (item) =>
     item.productId === productId &&
-    item.size === (size || null) &&
+    String(item.size || "") === String(size || "") &&
     (item.selectedMetalType || null) === (selectedMetalType || null) &&
     (item.selectedPurity || null) === (selectedPurity || null) &&
     (item.selectedColor || null) === (selectedColor || null) &&
@@ -593,7 +593,7 @@ exports.searchProducts = onCall({ region: "asia-south1" }, async (request) => {
   const {
     query,
     category,
-    material,
+
     minPrice,
     maxPrice,
     sortBy = "newest",

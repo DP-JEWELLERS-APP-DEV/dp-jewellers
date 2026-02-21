@@ -565,8 +565,8 @@ export default function ProductsPage() {
       ...prev,
       fixedMetals: prev.fixedMetals.map((fm, i) => {
         if (i !== fmIdx) return fm;
-        const has = fm.sizes?.find((s) => s.size === sizeStr);
-        if (has) return { ...fm, sizes: fm.sizes.map((s) => s.size === sizeStr ? { ...s, [field]: value } : s) };
+        const has = fm.sizes?.find((s) => String(s.size) === String(sizeStr));
+        if (has) return { ...fm, sizes: fm.sizes.map((s) => String(s.size) === String(sizeStr) ? { ...s, [field]: value } : s) };
         return { ...fm, sizes: [...(fm.sizes || []), { size: sizeStr, netWeight: '', grossWeight: '', [field]: value }] };
       }),
     }));
@@ -645,7 +645,7 @@ export default function ProductsPage() {
 
     // Resolve main metal weight: size-specific or base
     const sizeEntryMain = selectedSize && defaultVariant.sizes?.length > 0
-      ? defaultVariant.sizes.find(s => s.size === selectedSize) : null;
+      ? defaultVariant.sizes.find(s => String(s.size) === String(selectedSize)) : null;
     const netWeight = Number(sizeEntryMain?.netWeight ?? defaultVariant.netWeight) || 0;
     let metalValue = netWeight * ratePerGram;
     let totalNetWeight = netWeight;
@@ -659,7 +659,7 @@ export default function ProductsPage() {
       if (fmType === 'gold' && fm.purity && metalRates.gold) fmRate = metalRates.gold[fm.purity] || 0;
       else if (fmType === 'silver' && fm.purity && metalRates.silver) fmRate = metalRates.silver[fm.purity] || 0;
       else if (fmType === 'platinum' && metalRates.platinum) fmRate = metalRates.platinum?.[fm.purity] || metalRates.platinum?.perGram || 0;
-      const sizeRow = selectedSize && fm.sizes?.length > 0 ? fm.sizes.find(s => s.size === selectedSize) : null;
+      const sizeRow = selectedSize && fm.sizes?.length > 0 ? fm.sizes.find(s => String(s.size) === String(selectedSize)) : null;
       const fmWeight = Number(sizeRow?.netWeight ?? fm.netWeight) || 0;
       if (!fmWeight) continue;
       const fmValue = fmWeight * fmRate;
@@ -1661,7 +1661,7 @@ export default function ProductsPage() {
                       Per-Size Weights
                     </Typography>
                     {getAvailableSizes().map((sz) => {
-                      const sizeRow = fm.sizes?.find((s) => s.size === sz) || {};
+                      const sizeRow = fm.sizes?.find((s) => String(s.size) === String(sz)) || {};
                       return (
                         <Grid container spacing={1} key={sz} sx={{ mt: 0.5 }} alignItems="center">
                           <Grid item xs={2}>

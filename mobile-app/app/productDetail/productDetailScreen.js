@@ -268,9 +268,9 @@ const ProductDetailScreen = () => {
         }
 
         // If current size not available, use variant default
-        const availableSizes = (variant.sizes || []).map(s => s.size);
-        if (availableSizes.length > 0 && !availableSizes.includes(selectedSize)) {
-            setselectedSize(variant.defaultSize || availableSizes[0] || '');
+        const availableSizes = (variant.sizes || []).map(s => String(s.size));
+        if (availableSizes.length > 0 && !availableSizes.includes(String(selectedSize))) {
+            setselectedSize(variant.defaultSize ? String(variant.defaultSize) : availableSizes[0] || '');
         }
     }, [selectedPurity, product]);
 

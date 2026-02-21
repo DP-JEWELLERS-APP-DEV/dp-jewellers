@@ -105,13 +105,8 @@ export default function CollectionGridView({ collections, onEdit, onDelete }) {
               </Tooltip>
             </div>
 
-            {/* Graphic Placeholder */}
-            <div style={{ height: 140, background: '#FAFAF8', display: 'flex', alignItems: 'center', justifyContent: 'center', borderBottom: '1px solid #EBEBEB' }}>
-              <PhotoLibrary sx={{ fontSize: 48, color: '#E0E0E0' }} />
-            </div>
-
             {/* Content Details */}
-            <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', flex: 1 }}>
+            <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', flex: 1 }}>
               <div style={{ fontSize: 16, fontWeight: 700, color: '#1E1B4B', lineHeight: 1.2, marginBottom: 8, flex: 1 }}>
                 {collection.name}
               </div>
