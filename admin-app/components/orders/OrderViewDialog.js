@@ -47,8 +47,15 @@ export default function OrderViewDialog({
   const currentStatus = order.status || order.orderStatus || 'pending';
 
   const totalAmount = order.totalAmount || order.orderSummary?.totalAmount || 0;
-  const isPaidViaGateway = order.paymentStatus === 'paid' || order.paymentStatus === 'SUCCESS' || order.paymentStatus === 'completed' || order.paymentId;
-  const amountPaid = order.partialPayment?.isPartialPayment ? (order.partialPayment.amountPaid || 0) : (isPaidViaGateway ? totalAmount : 0);
+  
+  // Stricter check: it must be explicitly marked as paid OR have a valid Razorpay payment ID (e.g. "pay_xyz")
+  const isPaidStatus = order.paymentStatus === 'paid' || order.paymentStatus === 'SUCCESS' || order.paymentStatus === 'completed';
+  const hasValidPaymentId = typeof order.paymentId === 'string' && order.paymentId.startsWith('pay_');
+  const isPaidViaGateway = isPaidStatus || hasValidPaymentId;
+
+  const amountPaid = isPaidViaGateway 
+    ? (order.partialPayment?.isPartialPayment ? (order.partialPayment.amountPaid || 0) : totalAmount) 
+    : 0;
   const balanceDue = Math.max(0, totalAmount - amountPaid);
 
   return (
