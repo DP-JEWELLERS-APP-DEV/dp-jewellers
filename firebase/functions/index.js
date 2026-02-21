@@ -44,6 +44,7 @@ exports.listOrders = orders.listOrders;
 exports.updateOrderStatus = orders.updateOrderStatus;
 exports.getUserOrders = orders.getUserOrders;
 exports.getOrderDetails = orders.getOrderDetails;
+exports.cleanupPendingOrders = orders.cleanupPendingOrders;
 
 // ============================================
 // ADMIN USER FUNCTIONS

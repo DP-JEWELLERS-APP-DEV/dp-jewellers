@@ -1,4 +1,5 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
+const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { logger } = require("firebase-functions");
 const admin = require("firebase-admin");
 const crypto = require("crypto");
@@ -602,4 +603,48 @@ exports.getOrderDetails = onCall({ region: "asia-south1" }, async (request) => {
   }
 
   return { docId: orderDoc.id, ...order };
+});
+
+/**
+ * Scheduled function to automatically cleanup abandoned pending orders.
+ * Runs every 30 minutes and deletes orders that have been stuck in 'pending' 
+ * state for more than 30 minutes (i.e., user abandoned checkout).
+ */
+exports.cleanupPendingOrders = onSchedule({
+  schedule: "every 30 minutes",
+  timeZone: "Asia/Kolkata",
+  region: "asia-south1",
+}, async (_event) => {
+  const cleanupCutoff = new Date(Date.now() - 30 * 60 * 1000); // 30 minutes ago
+
+  try {
+    const pendingOrdersSnapshot = await db.collection("orders")
+      .where("orderStatus", "==", "pending")
+      .where("orderedAt", "<", cleanupCutoff)
+      .get();
+
+    if (pendingOrdersSnapshot.empty) {
+      logger.info("No abandoned pending orders to clean up.");
+      return;
+    }
+
+    const batch = db.batch();
+    let deletedCount = 0;
+
+    for (const doc of pendingOrdersSnapshot.docs) {
+      const orderData = doc.data();
+      // Double check that payment was actually never completed
+      if (orderData.paymentStatus === "pending") {
+        batch.delete(doc.ref);
+        deletedCount++;
+      }
+    }
+
+    if (deletedCount > 0) {
+      await batch.commit();
+      logger.info(`Successfully deleted ${deletedCount} abandoned pending orders.`);
+    }
+  } catch (error) {
+    logger.error("Error cleaning up pending orders:", error);
+  }
 });
