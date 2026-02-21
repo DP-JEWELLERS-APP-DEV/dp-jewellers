@@ -686,7 +686,7 @@ export default function ProductsPage() {
     const discount = Number(formData.discount) || 0;
 
     const jewelryTaxRate = Number(metalEntry.jewelryGst) || 3;
-    const makingTaxRate = Number(metalEntry.makingGst) || 5;
+    const makingTaxRate = Number(metalEntry.makingGst) || 0;
 
     const jewelryTaxable = metalValue + diamondValue;
     const labourTaxable = makingChargeAmount + wastageChargeAmount + stoneSettingCharges + designCharges;
@@ -1646,7 +1646,7 @@ export default function ProductsPage() {
                           <TextField fullWidth size="small" type="number" label="GST on Making (%)"
                             value={metalEntry.makingGst}
                             onChange={(e) => handleMetalEntryPricingChange(mIdx, 'makingGst', e.target.value)}
-                            placeholder="Default: 5%"
+                            placeholder="Default: 0%"
                           />
                         </Grid>
                       </Grid>

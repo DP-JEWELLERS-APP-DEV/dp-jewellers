@@ -344,7 +344,11 @@ function calculateVariantPriceInternal(product, rates, taxSettings, makingCharge
   // Tax: per-metal > product-level > global
   const productTax = product.tax || {};
   const jewelryTaxRate = metalPricing.jewelryGst || productTax.jewelryGst || taxSettings.gst?.jewelry || 3;
-  const makingTaxRate = metalPricing.makingGst || productTax.makingGst || taxSettings.gst?.makingCharges || 5;
+  const makingTaxRate = metalPricing.makingGst != null && metalPricing.makingGst !== ''
+    ? Number(metalPricing.makingGst)
+    : productTax.makingGst != null && productTax.makingGst !== ''
+      ? Number(productTax.makingGst)
+      : Number(taxSettings.gst?.makingCharges ?? 0);
 
   const jewelryTaxableAmount = totalMetalValue + diamondValue + gemstoneValue;
   const labourTaxableAmount = makingChargeAmount + wastageChargeAmount + stoneSettingCharges + designCharges;
