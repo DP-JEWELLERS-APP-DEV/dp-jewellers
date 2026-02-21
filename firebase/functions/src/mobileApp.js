@@ -1,4 +1,5 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
+const { logger } = require("firebase-functions");
 const admin = require("firebase-admin");
 const { _calculateVariantPriceInternal } = require("./priceCalculation");
 
@@ -737,7 +738,7 @@ exports.getHomePageData = onCall({ region: "asia-south1" }, async (_request) => 
 
     featured = featuredSnapshot.docs.map(mapProductDoc);
   } catch (err) {
-    console.error("getHomePageData: featured query failed", err);
+    logger.error("getHomePageData: featured query failed", err);
   }
 
   try {
@@ -749,7 +750,7 @@ exports.getHomePageData = onCall({ region: "asia-south1" }, async (_request) => 
 
     popular = popularSnapshot.docs.map(mapProductDoc);
   } catch (err) {
-    console.error("getHomePageData: popular query failed", err);
+    logger.error("getHomePageData: popular query failed", err);
   }
 
   try {
@@ -768,7 +769,7 @@ exports.getHomePageData = onCall({ region: "asia-south1" }, async (_request) => 
 
     categories = Array.from(categoriesSet).sort();
   } catch (err) {
-    console.error("getHomePageData: categories query failed", err);
+    logger.error("getHomePageData: categories query failed", err);
   }
 
   try {
@@ -791,7 +792,7 @@ exports.getHomePageData = onCall({ region: "asia-south1" }, async (_request) => 
       .sort((a, b) => a.displayOrder - b.displayOrder)
       .slice(0, 5);
   } catch (err) {
-    console.error("getHomePageData: banners query failed", err);
+    logger.error("getHomePageData: banners query failed", err);
   }
 
   let customCollections = [];
@@ -852,7 +853,7 @@ exports.getHomePageData = onCall({ region: "asia-south1" }, async (_request) => 
     customCollections.sort((a, b) => b.createdAt - a.createdAt);
     customCollections = customCollections.map(({ createdAt: _c, ...rest }) => rest);
   } catch (err) {
-    console.error("getHomePageData: customCollections query failed", err);
+    logger.error("getHomePageData: customCollections query failed", err);
   }
 
   // Build personalized recommendations if user is authenticated.
@@ -945,7 +946,7 @@ exports.getHomePageData = onCall({ region: "asia-south1" }, async (_request) => 
           .map(mapProductDoc)
           .filter((p) => p.isActive);
       } catch (err) {
-        console.error("getHomePageData: popularity query failed", err);
+        logger.error("getHomePageData: popularity query failed", err);
       }
 
       const byId = new Map();
@@ -969,7 +970,7 @@ exports.getHomePageData = onCall({ region: "asia-south1" }, async (_request) => 
         .map(({ _score, ...product }) => product);
     }
   } catch (err) {
-    console.error("getHomePageData: recommendation build failed", err);
+    logger.error("getHomePageData: recommendation build failed", err);
   }
 
   if (!recommended || recommended.length === 0) {

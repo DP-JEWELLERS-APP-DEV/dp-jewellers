@@ -282,7 +282,7 @@ exports.createOrder = onCall({ region: "asia-south1", secrets: ["RAZORPAY_KEY_ID
   } catch (err) {
     // Clean up the pending order if Razorpay fails
     await docRef.delete();
-    console.error("Razorpay order creation failed:", err);
+    logger.error("Razorpay order creation failed:", err);
     throw new HttpsError("internal", "Failed to initiate payment. Please try again.");
   }
 

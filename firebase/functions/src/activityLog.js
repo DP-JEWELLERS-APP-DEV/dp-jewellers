@@ -1,4 +1,5 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
+const { logger } = require("firebase-functions");
 const admin = require("firebase-admin");
 
 const db = admin.firestore();
@@ -24,7 +25,7 @@ function logActivity(data) {
   db.collection("activityLogs")
     .add(logEntry)
     .catch((err) => {
-      console.error("Failed to write activity log:", err.message);
+      logger.error("Failed to write activity log:", err.message);
     });
 }
 
@@ -94,7 +95,7 @@ exports.listActivityLogs = onCall(
       // Firestore composite index missing — extract the creation URL if present
       if (err.code === 9 && err.details && err.details.includes("create_composite")) {
         const urlMatch = err.details.match(/(https:\/\/console\.firebase\.google\.com\S+)/);
-        console.error("Missing Firestore index. Create it here:", urlMatch ? urlMatch[1] : err.details);
+        logger.error("Missing Firestore index. Create it here:", urlMatch ? urlMatch[1] : err.details);
         throw new HttpsError(
           "failed-precondition",
           "A database index is being created for this filter combination. Please try again in a few minutes."

@@ -86,7 +86,7 @@ exports.onImageUpload = onObjectFinalized(
       fs.unlinkSync(tempFilePath);
       fs.unlinkSync(tempThumbPath);
     } catch (error) {
-      console.error("Error processing image:", error);
+      logger.error("Error processing image:", error);
       // Clean up temp files on error
       if (fs.existsSync(tempFilePath)) fs.unlinkSync(tempFilePath);
       if (fs.existsSync(tempThumbPath)) fs.unlinkSync(tempThumbPath);

@@ -1,4 +1,5 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
+const { logger } = require("firebase-functions");
 const admin = require("firebase-admin");
 const { _calculateVariantPriceInternal, _computePriceRange, _getDefaultPricing } = require("./priceCalculation");
 const { requiresApproval } = require("./approvalUtils");
@@ -504,7 +505,7 @@ exports.listProducts = onCall({ region: "asia-south1" }, async (request) => {
       lastDoc: snapshot.docs.length > 0 ? snapshot.docs[snapshot.docs.length - 1].id : null,
     };
   } catch (err) {
-    console.error("listProducts failed", err);
+    logger.error("listProducts failed", err);
     throw new HttpsError("unknown", "Failed to list products. Please try again.");
   }
 });

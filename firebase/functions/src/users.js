@@ -1,4 +1,5 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
+const { logger } = require("firebase-functions");
 const admin = require("firebase-admin");
 const { logActivity } = require("./activityLog");
 
@@ -211,7 +212,7 @@ exports.getDashboardStats = onCall({ region: "asia-south1" }, async (request) =>
       monthlySales += order.totalAmount || order.pricing?.finalPrice || 0;
     });
   } catch (err) {
-    console.error("Error fetching sales stats:", err);
+    logger.error("Error fetching sales stats:", err);
   }
 
   return {
