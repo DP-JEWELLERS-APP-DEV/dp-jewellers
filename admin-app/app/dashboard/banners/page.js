@@ -129,7 +129,8 @@ export default function BannersPage() {
   const uploadImage = async () => {
     if (!imageFile) return formData.imageUrl;
     const storageRef = ref(storage, `banners/${Date.now()}_${imageFile.name}`);
-    await uploadBytes(storageRef, imageFile);
+    const metadata = { contentType: imageFile.type || 'image/jpeg' };
+    await uploadBytes(storageRef, imageFile, metadata);
     const url = await getDownloadURL(storageRef);
     return url;
   };
