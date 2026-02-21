@@ -1,4 +1,5 @@
 const { onObjectFinalized } = require("firebase-functions/v2/storage");
+const { logger } = require("firebase-functions");
 const admin = require("firebase-admin");
 const sharp = require("sharp");
 const path = require("path");
@@ -22,14 +23,14 @@ exports.onImageUpload = onObjectFinalized(
 
     // Only process images
     if (!contentType || !contentType.startsWith("image/")) {
-      console.log("Not an image, skipping.");
+      logger.info("Not an image, skipping.");
       return;
     }
 
     // Skip if already a thumbnail
     const fileName = path.basename(filePath);
     if (fileName.startsWith("thumb_")) {
-      console.log("Already a thumbnail, skipping.");
+      logger.info("Already a thumbnail, skipping.");
       return;
     }
 
@@ -37,11 +38,11 @@ exports.onImageUpload = onObjectFinalized(
     const validPrefixes = ["products/", "banners/", "stores/", "collections/"];
     const isValidPath = validPrefixes.some((prefix) => filePath.startsWith(prefix));
     if (!isValidPath) {
-      console.log(`Skipping file outside known paths: ${filePath}`);
+      logger.info(`Skipping file outside known paths: ${filePath}`);
       return;
     }
 
-    console.log(`Processing image: ${filePath}`);
+    logger.info(`Processing image: ${filePath}`);
 
     const fileDir = path.dirname(filePath);
     const fileExtension = path.extname(filePath);
@@ -79,7 +80,7 @@ exports.onImageUpload = onObjectFinalized(
         },
       });
 
-      console.log(`Thumbnail created: ${thumbFilePath}`);
+      logger.info(`Thumbnail created: ${thumbFilePath}`);
 
       // Clean up temp files
       fs.unlinkSync(tempFilePath);

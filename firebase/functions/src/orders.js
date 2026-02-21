@@ -1,4 +1,5 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
+const { logger } = require("firebase-functions");
 const admin = require("firebase-admin");
 const crypto = require("crypto");
 const Razorpay = require("razorpay");
@@ -102,7 +103,7 @@ exports.createOrder = onCall({ region: "asia-south1", secrets: ["RAZORPAY_KEY_ID
       makingChargesConfig = makingChargesDoc.data();
     }
   } catch (err) {
-    console.log("Warning: Could not fetch rates/config for pricing:", err.message);
+    logger.warn("Could not fetch rates/config for pricing:", err.message);
   }
 
   // Validate and build order items with current variant prices

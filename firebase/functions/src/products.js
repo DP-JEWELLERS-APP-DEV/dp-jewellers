@@ -432,8 +432,6 @@ exports.listProducts = onCall({ region: "asia-south1" }, async (request) => {
     startAfterDoc,
   } = request.data || {};
 
-  console.log("DEBUG listProducts called with:", JSON.stringify(request.data));
-
   try {
     let showAll = false;
     if (includeAll && request.auth) {
@@ -507,7 +505,7 @@ exports.listProducts = onCall({ region: "asia-south1" }, async (request) => {
     };
   } catch (err) {
     console.error("listProducts failed", err);
-    throw new HttpsError("unknown", `DEBUG: ${err.message}`);
+    throw new HttpsError("unknown", "Failed to list products. Please try again.");
   }
 });
 

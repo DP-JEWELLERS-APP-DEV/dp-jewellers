@@ -1,5 +1,6 @@
 const { onDocumentUpdated } = require("firebase-functions/v2/firestore");
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
+const { logger } = require("firebase-functions");
 const admin = require("firebase-admin");
 
 const db = admin.firestore();
@@ -38,9 +39,7 @@ exports.onMetalRatesUpdate = onDocumentUpdated(
     const newRates = event.data.after.data();
     const previousRates = event.data.before.data();
 
-    console.log("Metal rates updated. Recalculating all product prices...");
-    console.log("Previous rates:", JSON.stringify(previousRates));
-    console.log("New rates:", JSON.stringify(newRates));
+    logger.info("Metal rates updated. Recalculating all product prices...");
 
     // Get tax settings and making charges config
     const [taxDoc, makingChargesDoc] = await Promise.all([
@@ -56,11 +55,11 @@ exports.onMetalRatesUpdate = onDocumentUpdated(
       .get();
 
     if (productsSnapshot.empty) {
-      console.log("No active products to update.");
+      logger.info("No active products to update.");
       return;
     }
 
-    console.log(`Recalculating prices for ${productsSnapshot.size} products...`);
+    logger.info(`Recalculating prices for ${productsSnapshot.size} products...`);
 
     // Process in batches of 500 (Firestore batch limit)
     const batchSize = 500;
@@ -86,10 +85,10 @@ exports.onMetalRatesUpdate = onDocumentUpdated(
       }
 
       await batch.commit();
-      console.log(`Updated batch ${Math.floor(i / batchSize) + 1}`);
+      logger.info(`Updated batch ${Math.floor(i / batchSize) + 1}`);
     }
 
-    console.log(`Successfully recalculated prices for ${products.length} products.`);
+    logger.info(`Successfully recalculated prices for ${products.length} products.`);
   }
 );
 

@@ -14,13 +14,6 @@ const firebaseConfig = {
   appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID || Constants.expoConfig?.extra?.firebase?.appId,
 };
 
-console.log('[Firebase] Config loaded', {
-  hasApiKey: Boolean(firebaseConfig.apiKey),
-  authDomain: firebaseConfig.authDomain,
-  projectId: firebaseConfig.projectId,
-  appId: firebaseConfig.appId,
-});
-
 const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
 
 let auth;
