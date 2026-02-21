@@ -12,7 +12,11 @@ export function generateOrderReceipt(order, { getStoreName, getStoreAddress, for
   const totalAmount = totalAmountNum.toLocaleString('en-IN');
   const logoUrl = window.location.origin + '/dp-logo-02.png';
 
-  const isPaidViaGateway = order.paymentStatus === 'paid' || order.paymentStatus === 'SUCCESS' || order.paymentStatus === 'completed' || order.paymentId;
+  // Stricter check: it must be explicitly marked as paid OR have a valid Razorpay payment ID (e.g. "pay_xyz")
+  const isPaidStatus = order.paymentStatus === 'paid' || order.paymentStatus === 'SUCCESS' || order.paymentStatus === 'completed';
+  const hasValidPaymentId = typeof order.paymentId === 'string' && order.paymentId.startsWith('pay_');
+  const isPaidViaGateway = isPaidStatus || hasValidPaymentId;
+
   const amountPaidNum = order.partialPayment?.isPartialPayment ? (order.partialPayment.amountPaid || 0) : (isPaidViaGateway ? totalAmountNum : 0);
   const balanceDueNum = Math.max(0, totalAmountNum - amountPaidNum);
 
