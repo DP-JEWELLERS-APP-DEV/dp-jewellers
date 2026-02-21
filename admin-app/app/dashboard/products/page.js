@@ -1,6 +1,8 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
+import ProductListView from '@/components/products/ProductListView';
+import ProductGridView from '@/components/products/ProductGridView';
 import {
   Paper,
   Typography,
@@ -161,6 +163,8 @@ export default function ProductsPage() {
   const [searchInput, setSearchInput] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [filterVisibility, setFilterVisibility] = useState('all');
+  const [filterStatus, setFilterStatus] = useState('all'); // 'all' | 'active' | 'archived'
+  const [viewMode, setViewMode] = useState('list'); // 'list' | 'grid'
   const [collapsedMetalEntries, setCollapsedMetalEntries] = useState({});
 
   // Quick toggle handler for featured/bestseller/newArrival
@@ -958,6 +962,12 @@ export default function ProductsPage() {
 
   // Filtered products
   const filteredProducts = products.filter((p) => {
+    // Status filter
+    if (filterStatus !== 'all') {
+      const st = getProductStatus(p);
+      if (filterStatus === 'active' && st !== 'active') return false;
+      if (filterStatus === 'archived' && st !== 'archived') return false;
+    }
     if (filterCategory.length > 0 && !filterCategory.includes(p.category)) return false;
     const productMaterial = (p.configurator?.defaultMetalType || '').charAt(0).toUpperCase() + (p.configurator?.defaultMetalType || '').slice(1);
     if (filterMaterial.length > 0 && !filterMaterial.includes(productMaterial)) return false;
@@ -973,6 +983,12 @@ export default function ProductsPage() {
     return true;
   });
 
+  const statusCounts = {
+    all: products.length,
+    active: products.filter(p => getProductStatus(p) === 'active').length,
+    archived: products.filter(p => getProductStatus(p) === 'archived').length,
+  };
+
   const visibilityCounts = {
     featured: products.filter((p) => p.featured).length,
     bestseller: products.filter((p) => p.bestseller).length,
@@ -984,272 +1000,156 @@ export default function ProductsPage() {
   };
 
   return (
-    <div>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-        <Typography variant="h4" className="font-bold" sx={{ color: '#1E1B4B' }}>
-          Products Management
-        </Typography>
-        <Button
-          variant="contained"
-          startIcon={<Add />}
-          onClick={() => handleOpenDialog()}
-          sx={buttonSx}
-        >
-          Add Product
-        </Button>
-      </Box>
+    <div style={{ background: '#FAFAF8', minHeight: '100vh', padding: '0 0 40px' }}>
 
-      {/* Filters */}
-      <Box sx={{ display: 'flex', gap: 2, mb: 3, flexWrap: 'wrap', alignItems: 'flex-start' }}>
-        <Autocomplete
-          multiple
-          size="small"
-          options={categories}
-          value={filterCategory}
-          onChange={(_, val) => setFilterCategory(val)}
-          renderInput={(params) => <TextField {...params} label="Category" placeholder="Select" />}
-          sx={{ minWidth: 220 }}
-        />
-        <Autocomplete
-          multiple
-          size="small"
-          options={materials}
-          value={filterMaterial}
-          onChange={(_, val) => setFilterMaterial(val)}
-          renderInput={(params) => <TextField {...params} label="Material" placeholder="Select" />}
-          sx={{ minWidth: 220 }}
-        />
-        <Box sx={{ display: 'flex', gap: 1 }}>
-          <TextField
-            size="small"
-            placeholder="Search name or code"
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') handleSearch(); }}
-            sx={{ minWidth: 220 }}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <Search sx={{ fontSize: 20, color: '#999' }} />
-                </InputAdornment>
-              ),
-            }}
-          />
+      {/* ── Page Header ── */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+        <div>
+          <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: '#1E1B4B', letterSpacing: -0.3 }}>Products</h1>
+          <p style={{ margin: '2px 0 0', fontSize: 13, color: '#888' }}>
+            {filteredProducts.length} of {products.length} products
+          </p>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          {/* View toggle */}
+          <div style={{ display: 'flex', border: '1px solid #E5E7EB', borderRadius: 7, overflow: 'hidden' }}>
+            <button
+              onClick={() => setViewMode('list')}
+              style={{
+                padding: '6px 12px', border: 'none', cursor: 'pointer', fontSize: 13,
+                background: viewMode === 'list' ? '#1E1B4B' : '#fff',
+                color: viewMode === 'list' ? '#fff' : '#555',
+                display: 'flex', alignItems: 'center', gap: 5,
+              }}
+            >☰ List</button>
+            <button
+              onClick={() => setViewMode('grid')}
+              style={{
+                padding: '6px 12px', border: 'none', cursor: 'pointer', fontSize: 13,
+                background: viewMode === 'grid' ? '#1E1B4B' : '#fff',
+                color: viewMode === 'grid' ? '#fff' : '#555',
+                display: 'flex', alignItems: 'center', gap: 5,
+              }}
+            >⊞ Grid</button>
+          </div>
           <Button
             variant="contained"
-            onClick={handleSearch}
-            sx={{ ...buttonSx, minWidth: 'auto', px: 3 }}
+            startIcon={<Add />}
+            onClick={() => handleOpenDialog()}
+            sx={buttonSx}
           >
-            Search
+            Add Product
           </Button>
-          {searchQuery && (
-            <Button
-              variant="outlined"
-              onClick={() => { setSearchInput(''); setSearchQuery(''); }}
-              sx={{ minWidth: 'auto', px: 2, textTransform: 'none', borderColor: '#1E1B4B', color: '#1E1B4B' }}
-              startIcon={<Close sx={{ fontSize: 16 }} />}
-            >
-              Clear
-            </Button>
-          )}
-        </Box>
-      </Box>
+        </div>
+      </div>
 
-      {/* Visibility Filter Chips */}
-      <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap' }}>
-        <Chip
-          label="All"
-          onClick={() => setFilterVisibility('all')}
-          variant={filterVisibility === 'all' ? 'filled' : 'outlined'}
-          sx={filterVisibility === 'all' ? { backgroundColor: '#1E1B4B', color: '#fff' } : { borderColor: '#1E1B4B', color: '#1E1B4B' }}
+      {/* ── Filter bar ── */}
+      <div style={{
+        background: '#fff', border: '1px solid #EBEBEB', borderRadius: 10,
+        padding: '12px 16px', marginBottom: 12,
+        display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center',
+      }}>
+        <Autocomplete multiple size="small" options={categories} value={filterCategory}
+          onChange={(_, val) => setFilterCategory(val)}
+          renderInput={(params) => <TextField {...params} label="Category" placeholder="All" />}
+          sx={{ minWidth: 180 }}
         />
-        <Chip
-          icon={<Star sx={{ fontSize: 16 }} />}
-          label={`DP Signature (${visibilityCounts.featured})`}
-          onClick={() => setFilterVisibility(filterVisibility === 'featured' ? 'all' : 'featured')}
-          variant={filterVisibility === 'featured' ? 'filled' : 'outlined'}
-          sx={filterVisibility === 'featured' ? { backgroundColor: '#B8860B', color: '#fff', '& .MuiChip-icon': { color: '#fff' } } : { borderColor: '#B8860B', color: '#B8860B', '& .MuiChip-icon': { color: '#B8860B' } }}
+        <Autocomplete multiple size="small" options={materials} value={filterMaterial}
+          onChange={(_, val) => setFilterMaterial(val)}
+          renderInput={(params) => <TextField {...params} label="Material" placeholder="All" />}
+          sx={{ minWidth: 160 }}
         />
-        <Chip
-          icon={<LocalFireDepartment sx={{ fontSize: 16 }} />}
-          label={`Bestsellers (${visibilityCounts.bestseller})`}
-          onClick={() => setFilterVisibility(filterVisibility === 'bestseller' ? 'all' : 'bestseller')}
-          variant={filterVisibility === 'bestseller' ? 'filled' : 'outlined'}
-          sx={filterVisibility === 'bestseller' ? { backgroundColor: '#d32f2f', color: '#fff', '& .MuiChip-icon': { color: '#fff' } } : { borderColor: '#d32f2f', color: '#d32f2f', '& .MuiChip-icon': { color: '#d32f2f' } }}
+        <TextField
+          size="small" placeholder="Search name or SKU…"
+          value={searchInput}
+          onChange={(e) => setSearchInput(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') handleSearch(); }}
+          sx={{ minWidth: 220 }}
+          InputProps={{
+            startAdornment: <InputAdornment position="start"><Search sx={{ fontSize: 18, color: '#bbb' }} /></InputAdornment>,
+          }}
         />
-        <Chip
-          icon={<FiberNew sx={{ fontSize: 16 }} />}
-          label={`New Arrivals (${visibilityCounts.newArrival})`}
-          onClick={() => setFilterVisibility(filterVisibility === 'newArrival' ? 'all' : 'newArrival')}
-          variant={filterVisibility === 'newArrival' ? 'filled' : 'outlined'}
-          sx={filterVisibility === 'newArrival' ? { backgroundColor: '#1565c0', color: '#fff', '& .MuiChip-icon': { color: '#fff' } } : { borderColor: '#1565c0', color: '#1565c0', '& .MuiChip-icon': { color: '#1565c0' } }}
-        />
-      </Box>
+        <Button variant="contained" onClick={handleSearch} sx={{ ...buttonSx, minWidth: 'auto', px: 3 }}>Search</Button>
+        {(searchQuery || filterCategory.length > 0 || filterMaterial.length > 0) && (
+          <Button variant="text" onClick={() => { setSearchInput(''); setSearchQuery(''); setFilterCategory([]); setFilterMaterial([]); }}
+            sx={{ textTransform: 'none', color: '#888', fontSize: 12 }}
+          >Clear all</Button>
+        )}
+      </div>
 
-      {success && <Alert severity="success" className="!mb-4" onClose={() => setSuccess('')}>{success}</Alert>}
-      {error && <Alert severity="error" className="!mb-4" onClose={() => setError('')}>{error}</Alert>}
+      {/* ── Status + Visibility tabs ── */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
+        {/* Status tabs */}
+        <div style={{ display: 'flex', gap: 2, background: '#fff', border: '1px solid #EBEBEB', borderRadius: 8, padding: 3 }}>
+          {[['all', `All (${statusCounts.all})`], ['active', `Active (${statusCounts.active})`], ['archived', `Archived (${statusCounts.archived})`]].map(([val, label]) => (
+            <button key={val} onClick={() => setFilterStatus(val)}
+              style={{
+                padding: '5px 14px', borderRadius: 6, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600,
+                background: filterStatus === val ? '#1E1B4B' : 'transparent',
+                color: filterStatus === val ? '#fff' : '#666',
+                transition: 'all 0.15s',
+              }}
+            >{label}</button>
+          ))}
+        </div>
 
+        {/* Visibility chips */}
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          {[
+            { val: 'all',        label: 'All',            icon: null,              color: '#1E1B4B' },
+            { val: 'featured',   label: `⭐ Signature (${visibilityCounts.featured})`,  color: '#B8860B' },
+            { val: 'bestseller', label: `🔥 Bestsellers (${visibilityCounts.bestseller})`, color: '#d32f2f' },
+            { val: 'newArrival', label: `🆕 New (${visibilityCounts.newArrival})`,        color: '#1565c0' },
+          ].map(({ val, label, color }) => (
+            <button key={val} onClick={() => setFilterVisibility(filterVisibility === val && val !== 'all' ? 'all' : val)}
+              style={{
+                padding: '4px 12px', borderRadius: 99, fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                border: `1.5px solid ${filterVisibility === val ? color : '#E5E7EB'}`,
+                background: filterVisibility === val ? color : '#fff',
+                color: filterVisibility === val ? '#fff' : '#555',
+                transition: 'all 0.15s',
+              }}
+            >{label}</button>
+          ))}
+        </div>
+      </div>
+
+      {success && <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess('')}>{success}</Alert>}
+      {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>{error}</Alert>}
+
+      {/* ── Listing ── */}
       {loading ? (
         <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
           <CircularProgress sx={{ color: '#1E1B4B' }} />
         </Box>
       ) : (
-        <Paper elevation={2} sx={{ backgroundColor: 'white', borderRadius: 2 }}>
-          <DataGrid
-            rows={filteredProducts}
-            columns={[
-              { field: 'productCode', headerName: 'Code', width: 120, sortable: true },
-              { field: 'name', headerName: 'Name', flex: 1, minWidth: 150, sortable: true },
-              { field: 'category', headerName: 'Category', width: 120, sortable: true },
-              {
-                field: 'material',
-                headerName: 'Material',
-                width: 100,
-                sortable: true,
-                valueGetter: (value, row) => {
-                  const metalType = row.configurator?.defaultMetalType || '';
-                  const metals = row.configurator?.configurableMetals || [];
-                  const count = metals.length;
-                  if (count === 0) return '-';
-                  const label = metalType.charAt(0).toUpperCase() + metalType.slice(1);
-                  return count > 1 ? `${label} +${count - 1}` : label;
-                },
-              },
-              {
-                field: 'weight',
-                headerName: 'Weight (g)',
-                width: 100,
-                sortable: true,
-                valueGetter: (value, row) => {
-                  const cfg = row.configurator;
-                  if (!cfg) return 0;
-                  const defaultMetal = cfg.configurableMetals?.find(m => m.type === cfg.defaultMetalType) || cfg.configurableMetals?.[0];
-                  const defaultVariant = defaultMetal?.variants?.find(v => v.purity === cfg.defaultPurity) || defaultMetal?.variants?.[0];
-                  return defaultVariant?.netWeight || 0;
-                },
-                renderCell: (params) => {
-                  const cfg = params.row.configurator;
-                  if (!cfg) return '-';
-                  const defaultMetal = cfg.configurableMetals?.find(m => m.type === cfg.defaultMetalType) || cfg.configurableMetals?.[0];
-                  const defaultVariant = defaultMetal?.variants?.find(v => v.purity === cfg.defaultPurity) || defaultMetal?.variants?.[0];
-                  return defaultVariant?.netWeight || '-';
-                },
-              },
-              {
-                field: 'price',
-                headerName: 'Price',
-                width: 120,
-                sortable: true,
-                valueGetter: (value, row) => row.pricing?.finalPrice || 0,
-                renderCell: (params) => params.row.pricing?.finalPrice
-                  ? `₹${Number(params.row.pricing.finalPrice).toLocaleString('en-IN')}`
-                  : '-',
-              },
-              {
-                field: 'status',
-                headerName: 'Status',
-                width: 120,
-                sortable: true,
-                valueGetter: (value, row) => getProductStatus(row),
-                renderCell: (params) => (
-                  <Chip
-                    label={getStatusLabel(getProductStatus(params.row))}
-                    color={getStatusColor(getProductStatus(params.row))}
-                    size="small"
-                  />
-                ),
-              },
-              {
-                field: 'tags',
-                headerName: 'Tags',
-                width: 200,
-                sortable: false,
-                renderCell: (params) => (
-                  <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', alignItems: 'center', height: '100%' }}>
-                    {params.row.featured && <Chip label="Signature" size="small" sx={{ backgroundColor: '#B8860B', color: '#fff', fontSize: 11, height: 22 }} />}
-                    {params.row.bestseller && <Chip label="Bestseller" size="small" sx={{ backgroundColor: '#d32f2f', color: '#fff', fontSize: 11, height: 22 }} />}
-                    {params.row.newArrival && <Chip label="New" size="small" sx={{ backgroundColor: '#1565c0', color: '#fff', fontSize: 11, height: 22 }} />}
-                    {!params.row.featured && !params.row.bestseller && !params.row.newArrival && (
-                      <Typography variant="caption" sx={{ color: '#999' }}>—</Typography>
-                    )}
-                  </Box>
-                ),
-              },
-              {
-                field: 'actions',
-                headerName: 'Actions',
-                width: 230,
-                sortable: false,
-                filterable: false,
-                renderCell: (params) => (
-                  <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                    <Tooltip title={params.row.featured ? 'Remove from DP Signature' : 'Add to DP Signature'} arrow>
-                      <IconButton size="small" onClick={() => handleQuickToggle(params.row.productId, 'featured')} sx={{ color: params.row.featured ? '#B8860B' : '#ccc', mr: 0.25 }}>
-                        {params.row.featured ? <Star fontSize="small" /> : <StarBorder fontSize="small" />}
-                      </IconButton>
-                    </Tooltip>
-                    <Tooltip title={params.row.bestseller ? 'Remove from Bestsellers' : 'Add to Bestsellers'} arrow>
-                      <IconButton size="small" onClick={() => handleQuickToggle(params.row.productId, 'bestseller')} sx={{ color: params.row.bestseller ? '#d32f2f' : '#ccc', mr: 0.25 }}>
-                        <LocalFireDepartment fontSize="small" />
-                      </IconButton>
-                    </Tooltip>
-                    <Tooltip title={params.row.newArrival ? 'Remove New Arrival tag' : 'Mark as New Arrival'} arrow>
-                      <IconButton size="small" onClick={() => handleQuickToggle(params.row.productId, 'newArrival')} sx={{ color: params.row.newArrival ? '#1565c0' : '#ccc', mr: 0.25 }}>
-                        <FiberNew fontSize="small" />
-                      </IconButton>
-                    </Tooltip>
-                    <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
-                    <Tooltip title="Edit product details" arrow>
-                      <IconButton size="small" onClick={() => handleOpenDialog(params.row)} sx={{ color: '#1E1B4B', mr: 0.5 }}>
-                        <Edit fontSize="small" />
-                      </IconButton>
-                    </Tooltip>
-                    <Tooltip title="Soft delete" arrow>
-                      <IconButton size="small" onClick={() => handleDelete(params.row.productId)} sx={{ color: '#d32f2f', mr: 0.5 }}>
-                        <Delete fontSize="small" />
-                      </IconButton>
-                    </Tooltip>
-                    {getProductStatus(params.row) !== 'archived' ? (
-                      <Tooltip title="Archive" arrow>
-                        <IconButton size="small" onClick={() => handleArchive(params.row.productId)} sx={{ color: '#ed6c02' }}>
-                          <Archive fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                    ) : (
-                      <Tooltip title="Restore" arrow>
-                        <IconButton size="small" onClick={() => handleRestore(params.row.productId)} sx={{ color: '#2e7d32' }}>
-                          <RestoreFromTrash fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                    )}
-                  </Box>
-                ),
-              },
-            ]}
-            getRowId={(row) => row.productId}
-            initialState={{
-              pagination: { paginationModel: { pageSize: 10 } },
-              sorting: { sortModel: [{ field: 'name', sort: 'asc' }] },
-            }}
-            pageSizeOptions={[10, 25, 50]}
-            slots={{ toolbar: GridToolbar }}
-            slotProps={{
-              toolbar: {
-                showQuickFilter: true,
-                quickFilterProps: { debounceMs: 500 },
-              },
-            }}
-            disableRowSelectionOnClick
-            autoHeight
-            sx={{
-              border: 'none',
-              '& .MuiDataGrid-columnHeaders': { backgroundColor: '#f5f5f5', fontWeight: 'bold' },
-              '& .MuiDataGrid-row:hover': { backgroundColor: '#f9f9f9' },
-              '& .MuiDataGrid-toolbarContainer': { p: 2, gap: 2 },
-            }}
-            localeText={{ noRowsLabel: 'No products found. Add your first product!' }}
-          />
-        </Paper>
+        <div style={{
+          background: '#fff',
+          border: '1px solid #EBEBEB',
+          borderRadius: 10,
+          overflow: 'hidden',
+        }}>
+          {viewMode === 'list' ? (
+            <ProductListView
+              products={filteredProducts}
+              getProductStatus={getProductStatus}
+              onEdit={handleOpenDialog}
+              onDelete={handleDelete}
+              onArchive={handleArchive}
+              onRestore={handleRestore}
+              onQuickToggle={handleQuickToggle}
+            />
+          ) : (
+            <ProductGridView
+              products={filteredProducts}
+              getProductStatus={getProductStatus}
+              onEdit={handleOpenDialog}
+              onArchive={handleArchive}
+              onRestore={handleRestore}
+              onQuickToggle={handleQuickToggle}
+            />
+          )}
+        </div>
       )}
 
       {/* Add/Edit Product Dialog */}
