@@ -124,85 +124,105 @@ export default function Sidebar({ mobileOpen, handleDrawerToggle, adminData }) {
 
   const drawer = (
     <div className="h-full flex flex-col" style={{ backgroundColor: '#1E1B4B', minHeight: '100%' }}>
-      <div className="p-6">
-        <div className="flex justify-center mb-3">
-          <div className="bg-white rounded-md px-3 py-2 shadow-sm">
-            <Image
-              src="/dp-logo-02.png"
-              alt="DP Jewellers"
-              width={140}
-              height={55}
-              priority
-            />
+      {/* ── Logo Area ── */}
+      <div style={{ padding: '24px 20px 16px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+          <div style={{
+            background: '#fff', borderRadius: 8, padding: '8px 10px',
+            boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center'
+          }}>
+            <Image src="/dp-logo-02.png" alt="DP Jewellers" width={110} height={42} priority />
           </div>
         </div>
-
-        <Typography
-          variant="caption"
-          className="text-gray-300 text-center block mt-1"
-        >
-          Admin Panel
-        </Typography>
-        {adminData && (
-          <Typography
-            variant="caption"
-            className="text-gray-400 text-center block mt-1"
-            sx={{ textTransform: 'capitalize' }}
-          >
-            {adminData.role?.replace('_', ' ') || 'Admin'}
-          </Typography>
-        )}
+        <div style={{ paddingLeft: 4 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.2, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', marginBottom: 2 }}>
+            Admin Panel
+          </div>
+          {adminData && (
+            <div style={{ fontSize: 13, color: '#fff', fontWeight: 500, textTransform: 'capitalize' }}>
+              {adminData.role?.replace('_', ' ') || 'Admin'}
+            </div>
+          )}
+        </div>
       </div>
 
-      <Divider sx={{ borderColor: 'rgba(255, 255, 255, 0.12)' }} />
+      <Divider sx={{ borderColor: 'rgba(255,255,255,0.06)', mb: 2 }} />
 
-      <List className="flex-1 px-3 py-4" sx={{ overflowY: 'auto', minHeight: 0 }}>
-        {visibleMenuItems.map((item) => (
-          <ListItem key={item.text} disablePadding className="mb-2">
-            <Link href={item.path} className="w-full">
-              <ListItemButton
-                selected={pathname === item.path}
-                sx={{
-                  borderRadius: 2,
-                  color: 'white',
-                  '&:hover': {
-                    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-                  },
-                  '&.Mui-selected': {
-                    backgroundColor: 'rgba(255, 255, 255, 0.16)',
+      {/* ── Navigation ── */}
+      <List className="flex-1" sx={{ px: 2, py: 0, overflowY: 'auto' }}>
+        {visibleMenuItems.map((item) => {
+          const isActive = pathname === item.path;
+          return (
+            <ListItem key={item.text} disablePadding sx={{ mb: 0.5 }}>
+              <Link href={item.path} style={{ width: '100%', textDecoration: 'none' }}>
+                <ListItemButton
+                  selected={isActive}
+                  sx={{
+                    borderRadius: 2,
+                    py: 1.2,
+                    px: 2,
+                    color: isActive ? '#fff' : 'rgba(255,255,255,0.7)',
+                    background: isActive ? 'rgba(255,255,255,0.1)' : 'transparent',
+                    transition: 'all 0.2s',
                     '&:hover': {
-                      backgroundColor: 'rgba(255, 255, 255, 0.24)',
+                      background: isActive ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.05)',
+                      color: '#fff',
+                      '& .menu-icon': { color: '#C9A84C' }
                     },
-                  },
-                }}
-              >
-                <ListItemIcon sx={{ color: 'white', minWidth: 40 }}>
-                  {renderIcon(item)}
-                </ListItemIcon>
-                <ListItemText primary={item.text} />
-              </ListItemButton>
-            </Link>
-          </ListItem>
-        ))}
+                    '&.Mui-selected': {
+                      background: 'rgba(255,255,255,0.1)',
+                      '&:hover': { background: 'rgba(255,255,255,0.15)' },
+                    },
+                  }}
+                >
+                  <ListItemIcon
+                    className="menu-icon"
+                    sx={{
+                      minWidth: 40,
+                      color: isActive ? '#C9A84C' : 'inherit',
+                      transition: 'color 0.2s',
+                      '& svg': { fontSize: 22 }
+                    }}
+                  >
+                    {renderIcon(item)}
+                  </ListItemIcon>
+                  <ListItemText
+                    primary={item.text}
+                    primaryTypographyProps={{
+                      fontSize: 14,
+                      fontWeight: isActive ? 600 : 500,
+                      letterSpacing: 0.2,
+                    }}
+                  />
+                </ListItemButton>
+              </Link>
+            </ListItem>
+          );
+        })}
       </List>
 
-      <Divider sx={{ borderColor: 'rgba(255, 255, 255, 0.12)' }} />
+      <Divider sx={{ borderColor: 'rgba(255,255,255,0.06)', mt: 2 }} />
 
-      <div className="p-3">
+      {/* ── Footer / Logout ── */}
+      <div style={{ padding: '16px' }}>
         <ListItemButton
           onClick={handleLogout}
           sx={{
             borderRadius: 2,
-            color: 'white',
-            '&:hover': {
-              backgroundColor: 'rgba(255, 255, 255, 0.08)',
-            },
+            py: 1.2, px: 2,
+            color: 'rgba(255,255,255,0.7)',
+            transition: 'all 0.2s',
+            '&:hover': { background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444' }
           }}
         >
-          <ListItemIcon sx={{ color: 'white', minWidth: 40 }}>
+          <ListItemIcon sx={{ minWidth: 40, color: 'inherit', '& svg': { fontSize: 22 } }}>
             <Logout />
           </ListItemIcon>
-          <ListItemText primary="Logout" />
+          <ListItemText
+            primary="Sign out"
+            primaryTypographyProps={{ fontSize: 14, fontWeight: 500 }}
+          />
         </ListItemButton>
       </div>
     </div>
