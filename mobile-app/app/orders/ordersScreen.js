@@ -43,10 +43,18 @@ const OrdersScreen = () => {
         fetchOrders();
     };
 
-    const formatDate = (dateString) => {
-        if (!dateString) return '';
+    const formatDate = (dateValue) => {
+        if (!dateValue) return '';
         try {
-            const date = dateString.toDate ? dateString.toDate() : new Date(dateString);
+            let date;
+            if (dateValue.toDate) {
+                date = dateValue.toDate();
+            } else if (dateValue._seconds) {
+                date = new Date(dateValue._seconds * 1000);
+            } else {
+                date = new Date(dateValue);
+            }
+            if (isNaN(date.getTime())) return '';
             return date.toLocaleDateString('en-IN', {
                 year: 'numeric',
                 month: 'short',

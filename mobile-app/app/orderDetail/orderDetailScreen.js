@@ -1,41 +1,105 @@
-import { StyleSheet, Text, View, ScrollView, FlatList, Image, TouchableOpacity } from 'react-native'
-import React from 'react'
+import { StyleSheet, Text, View, ScrollView, FlatList, Image, TouchableOpacity, ActivityIndicator } from 'react-native'
+import React, { useState, useEffect } from 'react'
 import { Colors, Fonts, Sizes, CommomStyles, Screen } from '../../constants/styles';
 import { MaterialIcons } from '@expo/vector-icons';
 import MyStatusBar from '../../components/myStatusBar';
-import { useLocalSearchParams, useNavigation } from 'expo-router';
-
-const orderItemsList = [
-    {
-        id: '1',
-        jewelleryImage: require('../../assets/images/jewellery/jewellary1.png'),
-        jewelleryName: 'Silver Plated Ring',
-        size: 48,
-        amount: 120.00,
-    },
-    {
-        id: '2',
-        jewelleryImage: require('../../assets/images/jewellery/jewellary10.png'),
-        jewelleryName: 'Silver Grace Ring',
-        size: 46,
-        amount: 125.25,
-    },
-    {
-        id: '3',
-        jewelleryImage: require('../../assets/images/jewellery/jewellary3.png'),
-        jewelleryName: 'Diamond Earrings',
-        size: 'M',
-        amount: 149.50,
-    },
-];
+import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
+import { httpsCallable } from 'firebase/functions';
+import { functions } from '../../lib/firebase';
 
 const OrderDetailScreen = () => {
 
     const navigation = useNavigation();
+    const router = useRouter();
+    const { orderDocId, orderId } = useLocalSearchParams();
 
-    const { orderStatus } = useLocalSearchParams();
+    const [order, setOrder] = useState(null);
+    const [loading, setLoading] = useState(true);
 
-    const currentOrderStep = orderStatus == 'Packing' ? 1 : orderStatus == 'Shipping' ? 2 : orderStatus == 'Delivered' ? 4 : 3;
+    useEffect(() => {
+        fetchOrderDetails();
+    }, []);
+
+    const fetchOrderDetails = async () => {
+        try {
+            const getOrderDetails = httpsCallable(functions, 'getOrderDetails');
+            const res = await getOrderDetails({ orderDocId });
+            setOrder(res.data);
+        } catch (err) {
+            console.log('Error fetching order details:', err);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const formatDate = (dateValue) => {
+        if (!dateValue) return '';
+        try {
+            let date;
+            if (dateValue.toDate) {
+                date = dateValue.toDate();
+            } else if (dateValue._seconds) {
+                date = new Date(dateValue._seconds * 1000);
+            } else {
+                date = new Date(dateValue);
+            }
+            if (isNaN(date.getTime())) return '';
+            return date.toLocaleDateString('en-IN', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric'
+            });
+        } catch (e) {
+            return '';
+        }
+    };
+
+    const getOrderStep = (status) => {
+        switch (status?.toLowerCase()) {
+            case 'confirmed':
+            case 'processing':
+                return 1;
+            case 'ready_for_pickup':
+            case 'out_for_delivery':
+                return 2;
+            case 'delivered':
+                return 4;
+            case 'cancelled':
+                return 0;
+            default:
+                return 1;
+        }
+    };
+
+    if (loading) {
+        return (
+            <View style={{ flex: 1, backgroundColor: Colors.whiteColor, alignItems: 'center', justifyContent: 'center' }}>
+                <MyStatusBar />
+                <ActivityIndicator color={Colors.primaryColor} />
+            </View>
+        );
+    }
+
+    if (!order) {
+        return (
+            <View style={{ flex: 1, backgroundColor: Colors.whiteColor }}>
+                <MyStatusBar />
+                {header()}
+                <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+                    <Text style={{ ...Fonts.grayColor15Regular }}>Failed to load order details.</Text>
+                    <TouchableOpacity onPress={fetchOrderDetails} style={{ marginTop: Sizes.fixPadding }}>
+                        <Text style={{ ...Fonts.primaryColor16Medium }}>Retry</Text>
+                    </TouchableOpacity>
+                </View>
+            </View>
+        );
+    }
+
+    const currentOrderStep = getOrderStep(order.orderStatus);
+    const items = order.items || [];
+    const orderSummary = order.orderSummary || {};
+    const deliveryAddress = order.deliveryAddress || order.shippingAddress || {};
+    const storeName = order.selectedStore?.name || '';
 
     return (
         <View style={{ flex: 1, backgroundColor: Colors.whiteColor }}>
@@ -43,9 +107,9 @@ const OrderDetailScreen = () => {
             <View style={{ flex: 1 }}>
                 {header()}
                 <ScrollView automaticallyAdjustKeyboardInsets={true} showsVerticalScrollIndicator={false}>
-                    {orderStatusInfo()}
+                    {order.orderStatus !== 'cancelled' && orderStatusInfo()}
                     {orderItemsInfo()}
-                    {shippingDetailInfo()}
+                    {deliveryDetailInfo()}
                     {priceDetailInfo()}
                 </ScrollView>
             </View>
@@ -57,7 +121,7 @@ const OrderDetailScreen = () => {
         return (
             <TouchableOpacity
                 activeOpacity={0.8}
-                onPress={() => { navigation.push('(tabs)') }}
+                onPress={() => router.replace('/(tabs)/home/homeScreen')}
                 style={CommomStyles.buttonStyle}
             >
                 <Text style={{ ...Fonts.whiteColor19Medium }}>
@@ -79,15 +143,45 @@ const OrderDetailScreen = () => {
                             Sub Total
                         </Text>
                         <Text style={{ textAlign: 'right', ...Fonts.blackColor16Regular, marginTop: Sizes.fixPadding - 5.0 }}>
-                            $394.75
+                            {`₹ ${(orderSummary.subtotal || 0).toLocaleString('en-IN')}`}
                         </Text>
                     </View>
+                    {(orderSummary.makingCharges > 0) && (
+                        <View style={{ flexDirection: 'row', alignItems: 'center', marginHorizontal: Sizes.fixPadding, }}>
+                            <Text numberOfLines={1} style={{ ...Fonts.blackColor16Regular, flex: 1, }}>
+                                Making Charges
+                            </Text>
+                            <Text style={{ textAlign: 'right', ...Fonts.blackColor16Regular }}>
+                                {`₹ ${(orderSummary.makingCharges || 0).toLocaleString('en-IN')}`}
+                            </Text>
+                        </View>
+                    )}
+                    {(orderSummary.taxAmount > 0) && (
+                        <View style={{ flexDirection: 'row', alignItems: 'center', marginHorizontal: Sizes.fixPadding, }}>
+                            <Text numberOfLines={1} style={{ ...Fonts.blackColor16Regular, flex: 1, }}>
+                                Tax ({orderSummary.taxLabel || 'GST'})
+                            </Text>
+                            <Text style={{ textAlign: 'right', ...Fonts.blackColor16Regular }}>
+                                {`₹ ${(orderSummary.taxAmount || 0).toLocaleString('en-IN')}`}
+                            </Text>
+                        </View>
+                    )}
+                    {(orderSummary.discount > 0) && (
+                        <View style={{ flexDirection: 'row', alignItems: 'center', marginHorizontal: Sizes.fixPadding, }}>
+                            <Text numberOfLines={1} style={{ ...Fonts.greenColor16Regular || Fonts.blackColor16Regular, flex: 1, }}>
+                                Discount
+                            </Text>
+                            <Text style={{ textAlign: 'right', ...Fonts.blackColor16Regular, color: Colors.greenColor }}>
+                                {`- ₹ ${(orderSummary.discount || 0).toLocaleString('en-IN')}`}
+                            </Text>
+                        </View>
+                    )}
                     <View style={{ flexDirection: 'row', alignItems: 'center', marginHorizontal: Sizes.fixPadding, }}>
                         <Text numberOfLines={1} style={{ ...Fonts.blackColor16Regular, flex: 1, }}>
                             Delivery
                         </Text>
                         <Text style={{ textAlign: 'right', ...Fonts.blackColor16Regular, }}>
-                            Free
+                            {order.deliveryType === 'store_pickup' ? 'Store Pickup' : 'Free'}
                         </Text>
                     </View>
                     <View style={styles.dashedLineStyle} />
@@ -96,7 +190,7 @@ const OrderDetailScreen = () => {
                             Total
                         </Text>
                         <Text style={{ textAlign: 'right', ...Fonts.blackColor16SemiBold, }}>
-                            $394.75
+                            {`₹ ${(orderSummary.totalAmount || 0).toLocaleString('en-IN')}`}
                         </Text>
                     </View>
                 </View>
@@ -104,29 +198,45 @@ const OrderDetailScreen = () => {
         )
     }
 
-    function shippingDetailInfo() {
+    function deliveryDetailInfo() {
+        const isStorePickup = order.deliveryType === 'store_pickup';
         return (
             <View style={{ marginHorizontal: Sizes.fixPadding * 2.0, marginVertical: Sizes.fixPadding }}>
                 <Text style={{ ...Fonts.blackColor18SemiBold }}>
-                    Shipping Details
+                    {isStorePickup ? 'Pickup Details' : 'Shipping Details'}
                 </Text>
                 <View style={styles.shippingDetailInfoWrapStyle}>
                     <View style={{ flexDirection: 'row', }}>
                         <Text numberOfLines={1} style={{ flex: 1, ...Fonts.grayColor16Regular }}>
-                            Shipping Date
+                            Order Date
                         </Text>
                         <Text style={{ ...Fonts.blackColor16Regular }}>
-                            March 10,2020
+                            {formatDate(order.orderedAt)}
                         </Text>
                     </View>
-                    <View style={{ flexDirection: 'row', marginTop: Sizes.fixPadding }}>
-                        <Text numberOfLines={1} style={{ flex: 1, ...Fonts.grayColor16Regular }}>
-                            Address
-                        </Text>
-                        <Text numberOfLines={2} style={{ maxWidth: Screen.width / 1.7, textAlign: 'right', ...Fonts.blackColor16Regular }}>
-                            Kocherstr. 6, Zimmer 773, 25682, Nord Tino, Sachsen-Anhalt, Germany
-                        </Text>
-                    </View>
+                    {isStorePickup ? (
+                        storeName ? (
+                            <View style={{ flexDirection: 'row', marginTop: Sizes.fixPadding }}>
+                                <Text numberOfLines={1} style={{ flex: 1, ...Fonts.grayColor16Regular }}>
+                                    Store
+                                </Text>
+                                <Text numberOfLines={2} style={{ maxWidth: Screen.width / 1.7, textAlign: 'right', ...Fonts.blackColor16Regular }}>
+                                    {storeName}
+                                </Text>
+                            </View>
+                        ) : null
+                    ) : (
+                        deliveryAddress.fullAddress || deliveryAddress.address ? (
+                            <View style={{ flexDirection: 'row', marginTop: Sizes.fixPadding }}>
+                                <Text numberOfLines={1} style={{ flex: 1, ...Fonts.grayColor16Regular }}>
+                                    Address
+                                </Text>
+                                <Text numberOfLines={3} style={{ maxWidth: Screen.width / 1.7, textAlign: 'right', ...Fonts.blackColor16Regular }}>
+                                    {deliveryAddress.fullAddress || deliveryAddress.address}
+                                </Text>
+                            </View>
+                        ) : null
+                    )}
                 </View>
             </View>
         )
@@ -134,27 +244,38 @@ const OrderDetailScreen = () => {
 
     function orderItemsInfo() {
 
-        const renderItem = ({ item }) => (
+        const renderItem = ({ item, index }) => (
             <View style={styles.orderItemWrapStyle}>
                 <View style={{ flexDirection: 'row', flex: 1, alignItems: 'center' }}>
                     <View style={styles.jewelleryImageWrapStyle}>
-                        <Image
-                            source={item.jewelleryImage}
-                            style={{ width: '80%', resizeMode: 'contain', height: '80%', }}
-                        />
+                        {item.image ? (
+                            <Image
+                                source={{ uri: item.image }}
+                                style={{ width: '80%', resizeMode: 'contain', height: '80%', }}
+                            />
+                        ) : (
+                            <MaterialIcons name="image" size={32} color={Colors.lightGrayColor} />
+                        )}
                     </View>
                     <View style={{ flex: 1, marginLeft: Sizes.fixPadding + 3.0, }}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: Sizes.fixPadding - 13.0, }}>
                             <Text numberOfLines={1} style={{ flex: 1, ...Fonts.blackColor16Regular, marginRight: Sizes.fixPadding - 5.0 }}>
-                                {item.jewelleryName}
+                                {item.productName || item.name || 'Product'}
                             </Text>
                             <Text style={{ ...Fonts.blackColor16Regular }}>
-                                {`$`}{item.amount.toFixed(2)}
+                                {`₹ ${(item.price || item.totalPrice || 0).toLocaleString('en-IN')}`}
                             </Text>
                         </View>
-                        <Text style={{ ...Fonts.grayColor14Regular, marginTop: -2.0 }}>
-                            Size: 48
-                        </Text>
+                        {item.size && (
+                            <Text style={{ ...Fonts.grayColor14Regular, marginTop: -2.0 }}>
+                                Size: {item.size}
+                            </Text>
+                        )}
+                        {item.quantity > 1 && (
+                            <Text style={{ ...Fonts.grayColor14Regular, marginTop: -2.0 }}>
+                                Qty: {item.quantity}
+                            </Text>
+                        )}
                     </View>
                 </View>
             </View>
@@ -166,8 +287,8 @@ const OrderDetailScreen = () => {
                 </Text>
                 <View style={{ marginTop: Sizes.fixPadding, }}>
                     <FlatList
-                        data={orderItemsList}
-                        keyExtractor={(item) => `${item.id}`}
+                        data={items}
+                        keyExtractor={(item, index) => `${item.productId || index}`}
                         renderItem={renderItem}
                         scrollEnabled={false}
                     />
