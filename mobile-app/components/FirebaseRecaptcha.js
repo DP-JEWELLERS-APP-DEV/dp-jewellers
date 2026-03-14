@@ -1,201 +1,215 @@
-import React, { forwardRef, useImperativeHandle, useRef, useState } from 'react';
-import { Modal, View, StyleSheet, ActivityIndicator } from 'react-native';
+import React, { forwardRef, useImperativeHandle, useState, useRef } from 'react';
+import { View, Modal, ActivityIndicator, StyleSheet, Text, TouchableOpacity } from 'react-native';
 import { WebView } from 'react-native-webview';
+import auth from '@react-native-firebase/auth';
 
 const FirebaseRecaptcha = forwardRef(({ firebaseConfig, onVerify, onError, hideUI = false }, ref) => {
-  const [visible, setVisible] = useState(false);
-  const phoneRef = useRef('');
+  const [modalVisible, setModalVisible] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const webViewRef = useRef(null);
+  const [currentPhone, setCurrentPhone] = useState(null);
   const resolveRef = useRef(null);
   const rejectRef = useRef(null);
-  const webViewRef = useRef(null);
 
-  // Expose sendOtp(phoneNumber) → Promise<verificationId>
-  // The entire signInWithPhoneNumber flow runs inside the WebView where
-  // a real RecaptchaVerifier works natively with Firebase's reCAPTCHA.
+  const configJson = JSON.stringify(firebaseConfig);
+  const baseUrl = `https://${firebaseConfig.authDomain}`;
+
+  const htmlContent = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+        <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+      </head>
+      <body>
+        <div id="recaptcha-container"></div>
+        <script>
+          function log(msg) {
+            window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'log', message: msg }));
+          }
+
+          try {
+            var config = ${configJson};
+            firebase.initializeApp(config);
+            
+            var globalVerifier = new firebase.auth.RecaptchaVerifier('recaptcha-container', {
+              size: '${hideUI ? 'invisible' : 'normal'}',
+              callback: function(token) {
+                log('Recaptcha Solved Successfully');
+              },
+              'expired-callback': function() {
+                log('Recaptcha Expired');
+              }
+            });
+
+            window.sendOtp = function(phoneNumber) {
+              log('WebView: Starting OTP for ' + phoneNumber);
+              firebase.auth().signInWithPhoneNumber(phoneNumber, globalVerifier)
+                .then(function(confirmationResult) {
+                  log('WebView: Success!');
+                  window.ReactNativeWebView.postMessage(JSON.stringify({ 
+                    type: 'success', 
+                    verificationId: confirmationResult.verificationId 
+                  }));
+                })
+                .catch(function(error) {
+                  log('WebView Error: ' + error.code + ' - ' + error.message);
+                  window.ReactNativeWebView.postMessage(JSON.stringify({ 
+                    type: 'error', 
+                    code: error.code,
+                    message: error.message 
+                  }));
+                });
+            };
+
+            log('WebView Ready on ' + window.location.origin);
+            if ('${hideUI}' === 'true') {
+                globalVerifier.render();
+            }
+          } catch(e) {
+            log('WebView Init Error: ' + e.message);
+          }
+        </script>
+      </body>
+    </html>
+  `;
+
   useImperativeHandle(ref, () => ({
-    sendOtp: (phoneNumber) => {
-      return new Promise((resolve, reject) => {
-        phoneRef.current = phoneNumber;
-        resolveRef.current = resolve;
-        rejectRef.current = reject;
-        setVisible(true);
-      });
+    sendOtp: async (phoneNumber) => {
+      console.log('[Auth Strategy]: Attempting Native SDK first...');
+      try {
+        // Try native first (Fastest)
+        const confirmation = await auth().signInWithPhoneNumber(phoneNumber);
+        console.log('[Native SDK]: Success');
+        if (onVerify) onVerify(confirmation.verificationId);
+        return confirmation.verificationId;
+      } catch (err) {
+        console.warn('[Native SDK]: Failed (Expected on Emu). Falling back to WebView...', err.code);
+        
+        // Fallback to WebView
+        setCurrentPhone(phoneNumber);
+        setModalVisible(true);
+        if (hideUI) setLoading(true);
+
+        return new Promise((resolve, reject) => {
+          resolveRef.current = resolve;
+          rejectRef.current = reject;
+        });
+      }
     },
   }));
 
   const handleMessage = (event) => {
     try {
       const data = JSON.parse(event.nativeEvent.data);
-      if (data.type === 'success' && data.verificationId) {
-        setVisible(false);
+      if (data.type === 'log') {
+        console.log('[WebView Log]:', data.message);
+      } else if (data.type === 'success') {
+        setModalVisible(false);
+        setLoading(false);
         if (resolveRef.current) resolveRef.current(data.verificationId);
         if (onVerify) onVerify(data.verificationId);
       } else if (data.type === 'error') {
-        setVisible(false);
+        setModalVisible(false);
+        setLoading(false);
         const error = new Error(data.message || 'Failed to send OTP');
         if (rejectRef.current) rejectRef.current(error);
         if (onError) onError(error);
       }
     } catch (e) {
-      // Ignore non-JSON messages from WebView
+      console.error('Message Parse Error:', e);
     }
   };
 
-  const configJson = JSON.stringify(firebaseConfig || {});
-  const phoneJson = JSON.stringify(phoneRef.current || '');
-
-  const html = `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <style>
-    body {
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      min-height: 100vh;
-      margin: 0;
-      background: transparent;
-      font-family: -apple-system, sans-serif;
-    }
-    #recaptcha-container { min-height: 80px; }
-    #status {
-      color: #666;
-      margin-top: 16px;
-      text-align: center;
-      font-size: 14px;
-    }
-  </style>
-</head>
-<body>
-  <div id="recaptcha-container"></div>
-  <div id="status">Initializing...</div>
-  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"><\/script>
-  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"><\/script>
-  <script>
-    (function() {
-      var statusEl = document.getElementById('status');
-      try {
-        var config = ${configJson};
-        var phone = ${phoneJson};
-
-        firebase.initializeApp(config);
-
-        statusEl.textContent = 'Loading verification...';
-
-        var verifier = new firebase.auth.RecaptchaVerifier('recaptcha-container', {
-          size: 'invisible',
-          callback: function() {
-            statusEl.textContent = 'Sending OTP...';
-          }
-        });
-
-        firebase.auth().signInWithPhoneNumber(phone, verifier)
-          .then(function(confirmationResult) {
-            window.ReactNativeWebView.postMessage(JSON.stringify({
-              type: 'success',
-              verificationId: confirmationResult.verificationId
-            }));
-          })
-          .catch(function(err) {
-            window.ReactNativeWebView.postMessage(JSON.stringify({
-              type: 'error',
-              message: err.message || 'Failed to send OTP'
-            }));
-          });
-      } catch (e) {
-        window.ReactNativeWebView.postMessage(JSON.stringify({
-          type: 'error',
-          message: e.message || 'Initialization error'
-        }));
-      }
-    })();
-  <\/script>
-</body>
-</html>`;
-
-  const baseUrl = firebaseConfig?.authDomain
-    ? `https://${firebaseConfig.authDomain}`
-    : undefined;
-
-  if (hideUI) {
-    if (!visible) return null;
-    return (
-      <Modal visible={visible} transparent animationType="none" onRequestClose={() => setVisible(false)}>
-        <View style={styles.hiddenContainer} pointerEvents="none">
-          <WebView
-            ref={webViewRef}
-            source={{ html, baseUrl }}
-            onMessage={handleMessage}
-            javaScriptEnabled
-            domStorageEnabled
-            startInLoadingState
-            renderLoading={() => null}
-            style={styles.hiddenWebview}
-          />
-        </View>
-      </Modal>
-    );
-  }
-
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={() => setVisible(false)}>
-      <View style={styles.container}>
-        <View style={styles.webviewContainer}>
-          <WebView
-            ref={webViewRef}
-            source={{ html, baseUrl }}
-            onMessage={handleMessage}
-            javaScriptEnabled
-            domStorageEnabled
-            startInLoadingState
-            renderLoading={() => <ActivityIndicator size="large" color="#000" style={styles.loader} />}
-            style={styles.webview}
-          />
-        </View>
+    <Modal
+      visible={modalVisible}
+      transparent={hideUI}
+      animationType="slide"
+      onRequestClose={() => setModalVisible(false)}
+    >
+      <View style={hideUI ? styles.invisibleContainer : styles.visibleContainer}>
+        {!hideUI && (
+          <View style={styles.header}>
+            <Text style={styles.headerText}>Verification Required</Text>
+            <TouchableOpacity onPress={() => setModalVisible(false)}>
+              <Text style={styles.closeButton}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+        
+        <WebView
+          ref={webViewRef}
+          source={{ html: htmlContent, baseUrl: baseUrl }}
+          onMessage={handleMessage}
+          javaScriptEnabled={true}
+          domStorageEnabled={true}
+          onLoadEnd={() => {
+            if (currentPhone) {
+              webViewRef.current.injectJavaScript(`window.sendOtp("${currentPhone}");`);
+            }
+          }}
+          style={hideUI ? styles.invisibleWebView : styles.visibleWebView}
+        />
+
+        {loading && hideUI && (
+          <View style={styles.overlay}>
+            <ActivityIndicator size="large" color="#000" />
+            <Text style={styles.loadingText}>Securing connection...</Text>
+          </View>
+        )}
       </View>
     </Modal>
   );
 });
 
 const styles = StyleSheet.create({
-  container: {
+  invisibleContainer: {
+    height: 0,
+    width: 0,
+    opacity: 0,
+  },
+  visibleContainer: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: '#fff',
+    marginTop: 50,
+  },
+  invisibleWebView: {
+    height: 0,
+    width: 0,
+    opacity: 0,
+  },
+  visibleWebView: {
+    flex: 1,
+  },
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(255,255,255,0.9)',
     justifyContent: 'center',
     alignItems: 'center',
+    zIndex: 1000,
   },
-  webviewContainer: {
-    width: 350,
-    height: 500,
-    backgroundColor: 'white',
-    borderRadius: 12,
-    overflow: 'hidden',
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: '#333',
   },
-  webview: {
-    flex: 1,
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
   },
-  loader: {
-    position: 'absolute',
-    top: '50%',
-    left: '50%',
-    marginLeft: -20,
-    marginTop: -20,
+  headerText: {
+    fontSize: 18,
+    fontWeight: 'bold',
   },
-  hiddenContainer: {
-    position: 'absolute',
-    width: 1,
-    height: 1,
-    opacity: 0,
-    left: -1000,
-    top: -1000,
-  },
-  hiddenWebview: {
-    width: 1,
-    height: 1,
-  },
+  closeButton: {
+    color: '#007AFF',
+    fontSize: 16,
+  }
 });
 
 export default FirebaseRecaptcha;

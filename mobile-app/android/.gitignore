@@ -14,3 +14,7 @@ local.properties
 
 # Bundle artifacts
 *.jsbundle
+
+# Keystore secrets - never commit these
+keystore.properties
+app/release.keystore
