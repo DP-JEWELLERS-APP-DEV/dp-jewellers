@@ -108,12 +108,13 @@ exports.createProduct = onCall({ region: "asia-south1" }, async (request) => {
     },
     collections: data.collections || [],
     tags: data.tags || [],
-    inventory: data.inventory || {
-      inStock: true,
+    inventory: {
+      inStock: !data.status || data.status !== "out_of_stock",
       quantity: 1,
       lowStockThreshold: 2,
       preOrder: false,
       estimatedDeliveryDays: 7,
+      ...(data.inventory || {}),
     },
     featured: data.featured || false,
     bestseller: data.bestseller || false,
@@ -123,7 +124,7 @@ exports.createProduct = onCall({ region: "asia-south1" }, async (request) => {
     createdBy: request.auth.uid,
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
     updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    isActive: !data.status || data.status === "active" || data.status === "coming_soon",
+    isActive: !data.status || data.status === "active" || data.status === "coming_soon" || data.status === "out_of_stock",
     viewCount: 0,
     purchaseCount: 0,
   };
@@ -209,9 +210,20 @@ exports.updateProduct = onCall({ region: "asia-south1" }, async (request) => {
 
   const existingData = productDoc.data();
 
-  // Sync isActive with status if status changed
+  // Sync isActive and inventory.inStock with status if status changed
   if (updateData.status) {
-    updateData.isActive = updateData.status === "active" || updateData.status === "coming_soon";
+    // out_of_stock stays isActive=true so product remains visible (shows OOS badge)
+    // only inactive/archived/coming_soon hide the product
+    updateData.isActive = updateData.status === "active" ||
+                          updateData.status === "coming_soon" ||
+                          updateData.status === "out_of_stock";
+    // Keep inventory.inStock in sync so mobile app out-of-stock logic works correctly
+    const currentInventory = existingData.inventory || {};
+    updateData.inventory = {
+      ...currentInventory,
+      ...(updateData.inventory || {}),
+      inStock: updateData.status !== "out_of_stock",
+    };
   }
 
   // Always recalculate pricing from configurator
@@ -397,8 +409,10 @@ exports.getProduct = onCall({ region: "asia-south1" }, async (request) => {
 
   const product = productDoc.data();
 
-  // Non-admins can only see active products
-  if (!product.isActive) {
+  // Out-of-stock products are still visible to customers (they see the OOS badge)
+  // Only truly inactive/archived products are hidden
+  const isHidden = !product.isActive && product.status !== "out_of_stock";
+  if (isHidden) {
     if (!request.auth) {
       throw new HttpsError("not-found", "Product not found.");
     }

@@ -11,10 +11,12 @@ import Image from 'next/image';
 // ─── tiny helpers ────────────────────────────────────────────────────────────
 
 const STATUS_META = {
-  active:   { label: 'Active',   dot: '#22c55e', bg: '#f0fdf4', text: '#15803d' },
-  archived: { label: 'Archived', dot: '#94a3b8', bg: '#f1f5f9', text: '#475569' },
-  inactive: { label: 'Inactive', dot: '#f59e0b', bg: '#fffbeb', text: '#b45309' },
-  pending:  { label: 'Pending',  dot: '#3b82f6', bg: '#eff6ff', text: '#1d4ed8' },
+  active:        { label: 'Active',        dot: '#22c55e', bg: '#f0fdf4', text: '#15803d' },
+  archived:      { label: 'Archived',      dot: '#94a3b8', bg: '#f1f5f9', text: '#475569' },
+  inactive:      { label: 'Inactive',      dot: '#f59e0b', bg: '#fffbeb', text: '#b45309' },
+  pending:       { label: 'Pending',       dot: '#3b82f6', bg: '#eff6ff', text: '#1d4ed8' },
+  out_of_stock:  { label: 'Out of Stock',  dot: '#ef4444', bg: '#fef2f2', text: '#b91c1c' },
+  coming_soon:   { label: 'Coming Soon',   dot: '#8b5cf6', bg: '#f5f3ff', text: '#6d28d9' },
 };
 
 function StatusBadge({ status }) {
@@ -48,6 +50,7 @@ const COLS = [
   { key: 'category', label: 'Category',  flex: 1.5 },
   { key: 'weight',   label: 'Wt (g)',    flex: 1, align: 'right' },
   { key: 'price',    label: 'Price',     flex: 1.5, align: 'right' },
+  { key: 'stock',    label: 'Stock',     flex: 1, align: 'center' },
   { key: 'status',   label: 'Status',    flex: 1.5 },
   { key: 'actions',  label: '',          flex: 2.5, align: 'right' },
 ];
@@ -236,6 +239,28 @@ export default function ProductListView({
                 {/* Price */}
                 <td style={{ ...td, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
                   <span style={{ fontSize: 13, fontWeight: 600, color: '#1E1B4B' }}>{getProductPrice(p)}</span>
+                </td>
+
+                {/* Stock quantity */}
+                <td style={{ ...td, textAlign: 'center' }}>
+                  {(() => {
+                    const qty = p.inventory?.quantity ?? '—';
+                    const isOos = status === 'out_of_stock' || p.inventory?.inStock === false;
+                    return (
+                      <span style={{
+                        display: 'inline-block',
+                        minWidth: 28,
+                        padding: '1px 7px',
+                        borderRadius: 99,
+                        fontWeight: 700,
+                        fontSize: 12,
+                        background: isOos ? '#fef2f2' : qty <= 2 ? '#fffbeb' : '#f0fdf4',
+                        color: isOos ? '#b91c1c' : qty <= 2 ? '#b45309' : '#15803d',
+                      }}>
+                        {qty}
+                      </span>
+                    );
+                  })()}
                 </td>
 
                 {/* Status */}

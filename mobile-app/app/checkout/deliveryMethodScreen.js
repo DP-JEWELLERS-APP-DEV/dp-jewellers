@@ -6,6 +6,7 @@ import MyStatusBar from '../../components/myStatusBar';
 import { useNavigation, useRouter } from 'expo-router';
 import { httpsCallable } from 'firebase/functions';
 import { auth, functions } from '../../lib/firebase';
+import { DeliveryMethodShimmer } from '../../components/ShimmerPlaceholder';
 
 const DeliveryMethodScreen = () => {
 
@@ -51,9 +52,10 @@ const DeliveryMethodScreen = () => {
 
     if (loading) {
         return (
-            <View style={{ flex: 1, backgroundColor: Colors.whiteColor, alignItems: 'center', justifyContent: 'center' }}>
+            <View style={{ flex: 1, backgroundColor: Colors.whiteColor }}>
                 <MyStatusBar />
-                <ActivityIndicator color={Colors.primaryColor} />
+                {header()}
+                <DeliveryMethodShimmer />
             </View>
         );
     }

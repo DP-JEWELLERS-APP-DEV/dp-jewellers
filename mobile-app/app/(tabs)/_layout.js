@@ -10,6 +10,10 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { httpsCallable } from 'firebase/functions';
 import { auth, functions } from '../../lib/firebase';
 
+// In-memory TTL cache for tab badge counts (avoids redundant Cloud Function calls on every tab switch)
+const COUNTS_TTL_MS = 30000;
+let _cachedCounts = null; // { cartCount, favoritesCount, fetchedAt }
+
 export default function TabLayout() {
 
   const insets = useSafeAreaInsets();
@@ -52,29 +56,38 @@ export default function TabLayout() {
     return () => unsubscribe();
   }, []);
 
-  // Listen for cart/favorites updates from anywhere in the app
+  // Listen for cart/favorites updates from anywhere in the app — force refresh to invalidate cache
   useEffect(() => {
-    const cartSub = DeviceEventEmitter.addListener('cartUpdated', fetchCounts);
-    const favSub = DeviceEventEmitter.addListener('favoritesUpdated', fetchCounts);
+    const forceRefresh = () => {
+      _cachedCounts = null; // invalidate cache
+      if (auth?.currentUser) fetchCounts(true);
+    };
+    const cartSub = DeviceEventEmitter.addListener('cartUpdated', forceRefresh);
+    const favSub = DeviceEventEmitter.addListener('favoritesUpdated', forceRefresh);
     return () => {
       cartSub.remove();
       favSub.remove();
     };
   }, []);
 
-  const fetchCounts = async () => {
+  const fetchCounts = async (force = false) => {
+    // Skip if fresh data is available in cache (within TTL)
+    if (!force && _cachedCounts && (Date.now() - _cachedCounts.fetchedAt < COUNTS_TTL_MS)) {
+      setCartCount(_cachedCounts.cartCount);
+      setFavoritesCount(_cachedCounts.favoritesCount);
+      return;
+    }
     try {
-      // Fetch cart count
-      const getCart = httpsCallable(functions, 'getCart');
-      const cartRes = await getCart();
-      const cartItems = cartRes?.data?.cart || [];
-      setCartCount(cartItems.length);
-
-      // Fetch favorites count
-      const getFavorites = httpsCallable(functions, 'getFavorites');
-      const favRes = await getFavorites();
-      const favItems = favRes?.data?.favorites || [];
-      setFavoritesCount(favItems.length);
+      // Fetch cart and favorites in parallel to save time
+      const [cartRes, favRes] = await Promise.all([
+        httpsCallable(functions, 'getCart')(),
+        httpsCallable(functions, 'getFavorites')(),
+      ]);
+      const cartCount = (cartRes?.data?.cart || []).length;
+      const favCount = (favRes?.data?.favorites || []).length;
+      _cachedCounts = { cartCount, favoritesCount: favCount, fetchedAt: Date.now() };
+      setCartCount(cartCount);
+      setFavoritesCount(favCount);
     } catch (err) {
       // Ignore errors
     }

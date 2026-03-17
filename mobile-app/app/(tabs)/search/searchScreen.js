@@ -1,10 +1,11 @@
-import { StyleSheet, Text, View, Image, TextInput, ScrollView, TouchableOpacity, FlatList, ActivityIndicator } from 'react-native'
+import { StyleSheet, Text, View, Image, TextInput, ScrollView, TouchableOpacity, FlatList, ActivityIndicator, Platform } from 'react-native'
 import React, { useEffect, useRef, useState } from 'react'
 import { Colors, Fonts, Sizes, Screen } from '../../../constants/styles'
 import { Feather, MaterialIcons } from '@expo/vector-icons';
 import { useLocalSearchParams, useNavigation } from 'expo-router';
 import { httpsCallable } from 'firebase/functions';
 import { auth, functions } from '../../../lib/firebase';
+import { SearchScreenShimmer } from '../../../components/ShimmerPlaceholder';
 
 const popularSearches = [
     'Bracelets', 'Charms', 'Rings', 'Body Jewelry', 'Anklets', 'Necklace'
@@ -34,6 +35,15 @@ const SearchScreen = () => {
         maxPrice: '',
     });
     const lastTrackedSearchRef = useRef('');
+    const searchInputRef = useRef(null);
+
+    // Auto-focus the search input when the screen mounts so keyboard opens immediately
+    useEffect(() => {
+        const timeout = setTimeout(() => {
+            searchInputRef.current?.focus();
+        }, Platform.OS === 'android' ? 300 : 100);
+        return () => clearTimeout(timeout);
+    }, []);
 
     useEffect(() => {
         const material = params?.material ? String(params.material) : '';
@@ -101,9 +111,7 @@ const SearchScreen = () => {
             <View style={{ flex: 1 }}>
                 {searchBarWithFilterIcon()}
                 {loading ? (
-                    <View style={styles.centerWrap}>
-                        <ActivityIndicator color={Colors.primaryColor} />
-                    </View>
+                    <SearchScreenShimmer />
                 ) : errorText ? (
                     <View style={styles.centerWrap}>
                         <Text style={styles.errorText}>{errorText}</Text>
@@ -246,7 +254,8 @@ const SearchScreen = () => {
                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                     <Feather name="search" size={18} color={Colors.blackColor} />
                     <TextInput
-                        placeholder='Search'
+                        ref={searchInputRef}
+                        placeholder='Search jewellery…'
                         placeholderTextColor={Colors.grayColor}
                         style={{ padding: 0, ...Fonts.blackColor16Regular, flex: 1, marginHorizontal: Sizes.fixPadding }}
                         value={search}
@@ -254,7 +263,18 @@ const SearchScreen = () => {
                         cursorColor={Colors.primaryColor}
                         selectionColor={Colors.primaryColor}
                         numberOfLines={1}
+                        returnKeyType="search"
+                        autoCorrect={false}
                     />
+                    {search.length > 0 ? (
+                        <Feather
+                            name="x"
+                            size={18}
+                            color={Colors.grayColor}
+                            onPress={() => { setsearch(''); searchInputRef.current?.focus(); }}
+                            style={{ marginRight: Sizes.fixPadding }}
+                        />
+                    ) : null}
                     <Feather
                         name="sliders"
                         size={18}

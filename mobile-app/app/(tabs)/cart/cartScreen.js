@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View, Image, FlatList, TouchableOpacity, ActivityIndicator, DeviceEventEmitter } from 'react-native'
+import { StyleSheet, Text, View, Image, FlatList, TouchableOpacity, DeviceEventEmitter } from 'react-native'
 import React, { useEffect, useState, useCallback } from 'react'
 import { Colors, CommomStyles, Fonts, Screen, Sizes } from '../../../constants/styles';
 import { MaterialIcons, Feather, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -7,6 +7,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { httpsCallable } from 'firebase/functions';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth, functions } from '../../../lib/firebase';
+import { CartScreenShimmer } from '../../../components/ShimmerPlaceholder';
 
 const placeholderImage = require('../../../assets/images/jewellery/jewellary1.png');
 
@@ -84,14 +85,14 @@ const CartScreen = () => {
         );
     }
 
+    const hasOutOfStockItem = cart.some(item => item.inStock === false);
+
     return (
         <View style={{ flex: 1, backgroundColor: Colors.whiteColor }}>
             <View style={{ flex: 1 }}>
                 {header()}
                 {loading ? (
-                    <View style={styles.centerWrap}>
-                        <ActivityIndicator color={Colors.primaryColor} />
-                    </View>
+                    <CartScreenShimmer />
                 ) : errorText ? (
                     <View style={styles.centerWrap}>
                         <Text style={styles.errorText}>{errorText}</Text>
@@ -142,17 +143,31 @@ const CartScreen = () => {
 
     function proceedToCheckoutButton() {
         return (
-            <TouchableOpacity
-                activeOpacity={0.8}
-                onPress={() => {
-                    navigation.push('checkout/deliveryMethodScreen');
-                }}
-                style={{ ...CommomStyles.buttonStyle, marginTop: Sizes.fixPadding * 2.0 }}
-            >
-                <Text style={{ ...Fonts.whiteColor19Medium }}>
-                    Proceed to Checkout
-                </Text>
-            </TouchableOpacity>
+            <>
+                {hasOutOfStockItem && (
+                    <View style={styles.outOfStockWarning}>
+                        <MaterialIcons name="warning" size={16} color={Colors.redColor} />
+                        <Text style={{ ...Fonts.grayColor14Regular, color: Colors.redColor, marginLeft: 6, flex: 1 }}>
+                            Some items in your cart are out of stock. Remove them to proceed.
+                        </Text>
+                    </View>
+                )}
+                <TouchableOpacity
+                    activeOpacity={0.8}
+                    disabled={hasOutOfStockItem}
+                    onPress={() => {
+                        navigation.push('checkout/deliveryMethodScreen');
+                    }}
+                    style={[
+                        { ...CommomStyles.buttonStyle, marginTop: Sizes.fixPadding * 2.0 },
+                        hasOutOfStockItem && { backgroundColor: Colors.lightGrayColor }
+                    ]}
+                >
+                    <Text style={{ ...Fonts.whiteColor19Medium }}>
+                        Proceed to Checkout
+                    </Text>
+                </TouchableOpacity>
+            </>
         )
     }
 
@@ -254,13 +269,13 @@ const CartScreen = () => {
                         navigation.push('productDetail/productDetailScreen', { productId: item.productId });
                     }
                 }}
-                style={styles.cartItemWrapStyle}
+                style={[styles.cartItemWrapStyle, item.inStock === false && styles.cartItemOutOfStock]}
             >
                 <View style={{ flexDirection: 'row', flex: 1, }}>
                     <View style={styles.jewelleryImageWrapStyle}>
                         <Image
                             source={item.image ? { uri: item.image } : placeholderImage}
-                            style={{ width: '80%', resizeMode: 'contain', height: '80%', }}
+                            style={{ width: '80%', resizeMode: 'contain', height: '80%', opacity: item.inStock === false ? 0.5 : 1 }}
                         />
                     </View>
                     <View style={{ flex: 1, marginLeft: Sizes.fixPadding + 3.0, }}>
@@ -272,6 +287,11 @@ const CartScreen = () => {
                                 {`₹ ${Number(item.finalPrice || 0).toLocaleString('en-IN')}`}
                             </Text>
                         </View>
+                        {item.inStock === false && (
+                            <Text style={{ ...Fonts.grayColor14Regular, color: Colors.redColor, marginTop: 2, fontSize: 12 }}>
+                                Out of Stock
+                            </Text>
+                        )}
                         <Text style={{ ...Fonts.grayColor14Regular, marginTop: -2.0 }}>
                             {formatVariantInfo(item)}
                         </Text>
@@ -404,6 +424,22 @@ const styles = StyleSheet.create({
         borderRadius: Sizes.fixPadding,
         marginBottom: Sizes.fixPadding * 2.0,
         padding: Sizes.fixPadding
+    },
+    cartItemOutOfStock: {
+        borderColor: Colors.redColor,
+        borderWidth: 1.0,
+        opacity: 0.85,
+    },
+    outOfStockWarning: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginHorizontal: Sizes.fixPadding * 2.0,
+        marginTop: Sizes.fixPadding,
+        padding: Sizes.fixPadding,
+        backgroundColor: '#FFF0F0',
+        borderRadius: Sizes.fixPadding - 2,
+        borderWidth: 1,
+        borderColor: Colors.redColor + '40',
     },
     dashedLineStyle: {
         borderColor: Colors.offWhiteColor,

@@ -6,6 +6,7 @@ import { signOut, onAuthStateChanged } from 'firebase/auth'
 import { httpsCallable } from 'firebase/functions'
 import { auth, functions } from '../../../lib/firebase'
 import { Feather } from '@expo/vector-icons'
+import { ProfileScreenShimmer } from '../../../components/ShimmerPlaceholder';
 
 const ProfileScreen = () => {
 
@@ -40,8 +41,9 @@ const ProfileScreen = () => {
 
     if (loading) {
         return (
-            <View style={{ flex: 1, backgroundColor: Colors.whiteColor, alignItems: 'center', justifyContent: 'center' }}>
-                <ActivityIndicator color={Colors.primaryColor} />
+            <View style={{ flex: 1, backgroundColor: Colors.whiteColor }}>
+                {header()}
+                <ProfileScreenShimmer />
             </View>
         );
     }

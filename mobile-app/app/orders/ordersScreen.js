@@ -6,6 +6,7 @@ import MyStatusBar from '../../components/myStatusBar';
 import { useNavigation, useRouter, useFocusEffect } from 'expo-router';
 import { httpsCallable } from 'firebase/functions';
 import { functions } from '../../lib/firebase';
+import { OrdersScreenShimmer } from '../../components/ShimmerPlaceholder';
 
 const OrdersScreen = () => {
 
@@ -104,9 +105,10 @@ const OrdersScreen = () => {
 
     if (loading) {
         return (
-            <View style={{ flex: 1, backgroundColor: Colors.whiteColor, alignItems: 'center', justifyContent: 'center' }}>
+            <View style={{ flex: 1, backgroundColor: Colors.whiteColor }}>
                 <MyStatusBar />
-                <ActivityIndicator color={Colors.primaryColor} />
+                {header()}
+                <OrdersScreenShimmer />
             </View>
         );
     }

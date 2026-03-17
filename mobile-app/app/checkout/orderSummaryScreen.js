@@ -7,6 +7,7 @@ import { useNavigation, useRouter, useLocalSearchParams } from 'expo-router';
 import { httpsCallable } from 'firebase/functions';
 import { functions } from '../../lib/firebase';
 import RazorpayCheckout from 'react-native-razorpay';
+import { OrderSummaryShimmer } from '../../components/ShimmerPlaceholder';
 
 const placeholderImage = require('../../assets/images/jewellery/jewellary1.png');
 
@@ -28,6 +29,7 @@ const OrderSummaryScreen = () => {
     const [cartItems, setCartItems] = useState([]);
     const [loading, setLoading] = useState(true);
     const [processingPayment, setProcessingPayment] = useState(false);
+    const [fetchedCartTotal, setFetchedCartTotal] = useState(null); // recalculated from server
 
     const formatAddressType = (type) => {
         if (!type) return 'Address';
@@ -50,17 +52,19 @@ const OrderSummaryScreen = () => {
     const [customAmount, setCustomAmount] = useState('');
 
     const isPickup = deliveryMethod === 'store_pickup';
-    const minPayment = Math.ceil(cartTotal * 0.1);
+    // Use server-recalculated total if available; fall back to nav param
+    const effectiveCartTotal = fetchedCartTotal !== null ? fetchedCartTotal : cartTotal;
+    const minPayment = Math.ceil(effectiveCartTotal * 0.1);
 
     const parsedCustomAmount = Number(customAmount) || 0;
-    const isCustomAmountValid = parsedCustomAmount >= minPayment && parsedCustomAmount <= cartTotal;
+    const isCustomAmountValid = parsedCustomAmount >= minPayment && parsedCustomAmount <= effectiveCartTotal;
 
     const payableAmount = !isPickup || paymentOption === 'full'
-        ? cartTotal
+        ? effectiveCartTotal
         : paymentOption === 'partial'
             ? minPayment
             : isCustomAmountValid ? parsedCustomAmount : minPayment;
-    const remainingAmount = isPickup && paymentOption !== 'full' ? cartTotal - payableAmount : 0;
+    const remainingAmount = isPickup && paymentOption !== 'full' ? effectiveCartTotal - payableAmount : 0;
 
     useEffect(() => {
         fetchCart();
@@ -70,7 +74,13 @@ const OrderSummaryScreen = () => {
         try {
             const getCart = httpsCallable(functions, 'getCart');
             const res = await getCart();
-            setCartItems(res?.data?.cart || []);
+            const items = res?.data?.cart || [];
+            setCartItems(items);
+            // Recalculate total from server-returned finalPrice values
+            const serverTotal = items.reduce((acc, item) => acc + (item.quantity || 0) * (item.finalPrice || 0), 0);
+            if (serverTotal > 0) {
+                setFetchedCartTotal(serverTotal);
+            }
         } catch (err) {
             console.log('Error fetching cart:', err);
         } finally {
@@ -80,7 +90,17 @@ const OrderSummaryScreen = () => {
 
     const handlePayment = async () => {
         if (isPickup && paymentOption === 'custom' && !isCustomAmountValid) {
-            Alert.alert('Invalid Amount', `Please enter an amount between ₹${minPayment.toLocaleString('en-IN')} (10%) and ₹${cartTotal.toLocaleString('en-IN')}.`);
+            Alert.alert('Invalid Amount', `Please enter an amount between ₹${minPayment.toLocaleString('en-IN')} (10%) and ₹${effectiveCartTotal.toLocaleString('en-IN')}.`);
+            return;
+        }
+
+        if (!payableAmount || payableAmount <= 0) {
+            Alert.alert('Cart Error', 'Your cart total is zero or could not be calculated. Please go back and try again.');
+            return;
+        }
+
+        if (cartItems.length === 0) {
+            Alert.alert('Empty Cart', 'Your cart is empty. Please add items before proceeding to payment.');
             return;
         }
 
@@ -180,9 +200,10 @@ const OrderSummaryScreen = () => {
 
     if (loading) {
         return (
-            <View style={{ flex: 1, backgroundColor: Colors.whiteColor, alignItems: 'center', justifyContent: 'center' }}>
+            <View style={{ flex: 1, backgroundColor: Colors.whiteColor }}>
                 <MyStatusBar />
-                <ActivityIndicator color={Colors.primaryColor} />
+                {header()}
+                <OrderSummaryShimmer />
             </View>
         );
     }
@@ -218,7 +239,7 @@ const OrderSummaryScreen = () => {
                     <View style={{ flex: 1 }}>
                         <Text style={{ ...Fonts.blackColor16Medium }}>Pay 10% Now</Text>
                         <Text style={{ ...Fonts.grayColor14Regular, marginTop: 2 }}>
-                            Pay ₹{minPayment.toLocaleString('en-IN')} now, rest at pickup
+                            Pay ₹{minPayment.toLocaleString('en-IN')} now, rest ₹{(effectiveCartTotal - minPayment).toLocaleString('en-IN')} at pickup
                         </Text>
                     </View>
                     <View style={[styles.radioOuter, paymentOption === 'partial' && styles.radioOuterSelected]}>
@@ -255,7 +276,7 @@ const OrderSummaryScreen = () => {
                             <Text style={{ ...Fonts.grayColor14Regular, color: Colors.redColor, marginTop: 4 }}>
                                 {parsedCustomAmount < minPayment
                                     ? `Minimum amount is ₹${minPayment.toLocaleString('en-IN')} (10%)`
-                                    : `Maximum amount is ₹${cartTotal.toLocaleString('en-IN')}`}
+                                    : `Maximum amount is ₹${effectiveCartTotal.toLocaleString('en-IN')}`}
                             </Text>
                         )}
                     </View>
@@ -272,7 +293,7 @@ const OrderSummaryScreen = () => {
                     <View style={{ flex: 1 }}>
                         <Text style={{ ...Fonts.blackColor16Medium }}>Pay Full Amount</Text>
                         <Text style={{ ...Fonts.grayColor14Regular, marginTop: 2 }}>
-                            Pay ₹{cartTotal.toLocaleString('en-IN')} now
+                            Pay ₹{effectiveCartTotal.toLocaleString('en-IN')} now
                         </Text>
                     </View>
                     <View style={[styles.radioOuter, paymentOption === 'full' && styles.radioOuterSelected]}>
@@ -292,7 +313,7 @@ const OrderSummaryScreen = () => {
                 <View style={styles.priceCard}>
                     <View style={styles.priceRow}>
                         <Text style={{ ...Fonts.grayColor14Regular }}>Order Total</Text>
-                        <Text style={{ ...Fonts.blackColor16Regular }}>{`₹ ${cartTotal.toLocaleString('en-IN')}`}</Text>
+                        <Text style={{ ...Fonts.blackColor16Regular }}>{`₹ ${effectiveCartTotal.toLocaleString('en-IN')}`}</Text>
                     </View>
                     <View style={styles.priceRow}>
                         <Text style={{ ...Fonts.grayColor14Regular }}>Delivery</Text>

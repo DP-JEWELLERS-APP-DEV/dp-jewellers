@@ -8,6 +8,7 @@ import { auth, functions } from '../../../lib/firebase';
 import { Snackbar } from 'react-native-paper';
 import ProductCard from '../../../components/ProductCard';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { HomeScreenShimmer } from '../../../components/ShimmerPlaceholder';
 
 const placeholderImage = require('../../../assets/images/jewellery/jewellary1.png');
 const categoryImageMap = {
@@ -184,8 +185,9 @@ const HomeScreen = () => {
 
     useEffect(() => {
         let active = true;
-        const fetchHomeData = async () => {
-            setloading(true);
+
+        const fetchHomeData = async (silent = false) => {
+            if (!silent) setloading(true);
             seterrorText('');
             try {
                 const getHomePageData = httpsCallable(functions, 'getHomePageData');
@@ -198,21 +200,26 @@ const HomeScreen = () => {
                 if (active) {
                     const loaded = await loadCachedHomeData();
                     if (loaded) {
-                        handleShowSnackBar('Showing saved data (offline).');
+                        if (!silent) handleShowSnackBar('Showing saved data (offline).');
                         seterrorText('');
                     } else {
                         seterrorText('Failed to load home data.');
                     }
                 }
             } finally {
-                if (active) setloading(false);
+                if (active && !silent) setloading(false);
             }
         };
 
         (async () => {
-            await loadCachedHomeData();
-            if (active) {
-                fetchHomeData();
+            const hasCached = await loadCachedHomeData();
+            if (hasCached && active) {
+                // Cache available: show content immediately, refresh silently in background
+                setloading(false);
+                fetchHomeData(true);
+            } else if (active) {
+                // No cache: show shimmer until data arrives
+                fetchHomeData(false);
             }
         })();
 
@@ -289,9 +296,7 @@ const HomeScreen = () => {
             <View style={{ flex: 1 }}>
                 {header()}
                 {loading && !hasCachedData ? (
-                    <View style={styles.centerWrap}>
-                        <ActivityIndicator color={Colors.primaryColor} />
-                    </View>
+                    <HomeScreenShimmer />
                 ) : errorText ? (
                     <View style={styles.centerWrap}>
                         <Text style={styles.errorText}>{errorText}</Text>
@@ -513,8 +518,9 @@ const HomeScreen = () => {
             <View style={{ width: itemWidth, height: itemHeight, alignItems: 'center' }}>
                 <ImageBackground
                     source={{ uri: item.imageUrl }}
-                    style={{ width: cardWidth, height: itemHeight }}
+                    style={{ width: cardWidth, height: itemHeight, backgroundColor: Colors.offWhiteColor }}
                     borderRadius={Sizes.fixPadding}
+                    fadeDuration={300}
                 >
                     <View style={{
                         flex: 1,

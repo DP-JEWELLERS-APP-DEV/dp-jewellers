@@ -129,6 +129,7 @@ const emptyForm = {
   huidNumber: '',
   stoneDetails: '',
   status: 'active',
+  stockQuantity: '1',
   // Unified metal entries (always configurator format)
   metalEntries: [{ ...emptyMetalEntry }],
   defaultMetalType: 'Gold',
@@ -313,6 +314,7 @@ export default function ProductsPage() {
         huidNumber: product.certifications?.certificateNumber || '',
         stoneDetails: product.gemstones?.length > 0 ? product.gemstones.map(g => `${g.caratWeight || ''} ct ${g.type || ''}`).join(', ') : '',
         status: product.status || (product.isActive !== false ? 'active' : 'inactive'),
+        stockQuantity: String(product.inventory?.quantity ?? 1),
         metalEntries,
         defaultMetalType,
         defaultPurity,
@@ -793,6 +795,10 @@ export default function ProductsPage() {
         featured: formData.featured,
         bestseller: formData.bestseller,
         newArrival: formData.newArrival,
+        inventory: {
+          quantity: Math.max(0, Number(formData.stockQuantity) || 0),
+          inStock: formData.status !== 'out_of_stock' && (Number(formData.stockQuantity) || 0) > 0,
+        },
       };
 
       // Serialize configurator (always enabled)
@@ -2024,13 +2030,18 @@ export default function ProductsPage() {
 
           {/* Section 8: Status */}
           <Typography variant="subtitle1" sx={{ fontWeight: 'bold', color: '#1E1B4B', mb: 2 }}>
-            Status
+            Status & Inventory
           </Typography>
           <Grid container spacing={2}>
-            <Grid item xs={12} sm={6}>
+            <Grid item xs={12} sm={4}>
               <TextField fullWidth size="small" select label="Status"
                 value={formData.status}
-                onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                onChange={(e) => {
+                  const newStatus = e.target.value;
+                  // Auto-set quantity to 0 when marking out of stock
+                  const newQty = newStatus === 'out_of_stock' ? '0' : (formData.stockQuantity === '0' ? '1' : formData.stockQuantity);
+                  setFormData({ ...formData, status: newStatus, stockQuantity: newQty });
+                }}
                 sx={{ minWidth: 180 }}
               >
                 <MenuItem value="active">Active</MenuItem>
@@ -2038,6 +2049,21 @@ export default function ProductsPage() {
                 <MenuItem value="out_of_stock">Out of Stock</MenuItem>
                 <MenuItem value="coming_soon">Coming Soon</MenuItem>
               </TextField>
+            </Grid>
+            <Grid item xs={12} sm={4}>
+              <TextField
+                fullWidth size="small" label="Stock Quantity"
+                type="number"
+                inputProps={{ min: 0, step: 1 }}
+                value={formData.stockQuantity}
+                onChange={(e) => {
+                  const qty = Math.max(0, parseInt(e.target.value) || 0);
+                  // Auto-update status when quantity changes
+                  const newStatus = qty === 0 ? 'out_of_stock' : (formData.status === 'out_of_stock' ? 'active' : formData.status);
+                  setFormData({ ...formData, stockQuantity: String(qty), status: newStatus });
+                }}
+                helperText="Units available. Auto-marks out of stock at 0."
+              />
             </Grid>
 
             <Grid item xs={12} sm={6}>

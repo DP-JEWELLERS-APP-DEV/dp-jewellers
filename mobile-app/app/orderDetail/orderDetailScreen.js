@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View, ScrollView, FlatList, Image, TouchableOpacity, ActivityIndicator } from 'react-native'
+import { StyleSheet, Text, View, ScrollView, FlatList, Image, TouchableOpacity } from 'react-native'
 import React, { useState, useEffect } from 'react'
 import { Colors, Fonts, Sizes, CommomStyles, Screen } from '../../constants/styles';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -6,6 +6,7 @@ import MyStatusBar from '../../components/myStatusBar';
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { httpsCallable } from 'firebase/functions';
 import { functions } from '../../lib/firebase';
+import { OrderDetailShimmer } from '../../components/ShimmerPlaceholder';
 
 const OrderDetailScreen = () => {
 
@@ -73,9 +74,10 @@ const OrderDetailScreen = () => {
 
     if (loading) {
         return (
-            <View style={{ flex: 1, backgroundColor: Colors.whiteColor, alignItems: 'center', justifyContent: 'center' }}>
+            <View style={{ flex: 1, backgroundColor: Colors.whiteColor }}>
                 <MyStatusBar />
-                <ActivityIndicator color={Colors.primaryColor} />
+                {header()}
+                <OrderDetailShimmer />
             </View>
         );
     }
@@ -257,20 +259,20 @@ const OrderDetailScreen = () => {
                             <MaterialIcons name="image" size={32} color={Colors.lightGrayColor} />
                         )}
                     </View>
-                    <View style={{ flex: 1, marginLeft: Sizes.fixPadding + 3.0, }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: Sizes.fixPadding - 13.0, }}>
-                            <Text numberOfLines={1} style={{ flex: 1, ...Fonts.blackColor16Regular, marginRight: Sizes.fixPadding - 5.0 }}>
-                                {item.productName || item.name || 'Product'}
-                            </Text>
-                            <Text style={{ ...Fonts.blackColor16Regular }}>
-                                {`₹ ${(item.price || item.totalPrice || 0).toLocaleString('en-IN')}`}
-                            </Text>
-                        </View>
-                        {item.size && (
-                            <Text style={{ ...Fonts.grayColor14Regular, marginTop: -2.0 }}>
-                                Size: {item.size}
-                            </Text>
-                        )}
+                        <View style={{ flex: 1, marginLeft: Sizes.fixPadding + 3.0, }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: Sizes.fixPadding - 13.0, }}>
+                                <Text numberOfLines={1} style={{ flex: 1, ...Fonts.blackColor16Regular, marginRight: Sizes.fixPadding - 5.0 }}>
+                                    {item.productName || item.name || 'Product'}
+                                </Text>
+                                <Text style={{ ...Fonts.blackColor16Regular }}>
+                                    {`₹ ${(item.priceSnapshot?.itemTotal || item.price || item.totalPrice || 0).toLocaleString('en-IN')}`}
+                                </Text>
+                            </View>
+                            {(item.selectedSize || item.size) && (
+                                <Text style={{ ...Fonts.grayColor14Regular, marginTop: -2.0 }}>
+                                    Size: {item.selectedSize || item.size}
+                                </Text>
+                            )}
                         {item.quantity > 1 && (
                             <Text style={{ ...Fonts.grayColor14Regular, marginTop: -2.0 }}>
                                 Qty: {item.quantity}

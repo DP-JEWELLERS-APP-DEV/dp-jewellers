@@ -8,6 +8,7 @@ import MyStatusBar from '../../components/myStatusBar';
 import { useLocalSearchParams, useNavigation, useRouter, useFocusEffect } from 'expo-router';
 import { httpsCallable } from 'firebase/functions';
 import { auth, functions } from '../../lib/firebase';
+import { ProductDetailShimmer } from '../../components/ShimmerPlaceholder';
 
 const fallbackImage = require('../../assets/images/jewellery/jewellary15.png');
 
@@ -128,49 +129,37 @@ const ProductDetailScreen = () => {
         });
     }, [productId, product?.category]);
 
+    // Fetch cart + favorites in parallel on focus
     useFocusEffect(
         useCallback(() => {
             let active = true;
-            const checkCartStatus = async () => {
+            const checkCartAndFavorites = async () => {
                 if (!auth?.currentUser || !productId) {
-                    if (active) setAddedToCart(false);
+                    if (active) {
+                        setAddedToCart(false);
+                        setisFavorite(false);
+                    }
                     return;
                 }
                 try {
-                    const getCart = httpsCallable(functions, 'getCart');
-                    const res = await getCart();
-                    const cartItems = res?.data?.cart || [];
-                    const exists = cartItems.some((item) => item.productId === productId);
-                    if (active) setAddedToCart(exists);
+                    const [cartRes, favRes] = await Promise.all([
+                        httpsCallable(functions, 'getCart')(),
+                        httpsCallable(functions, 'getFavorites')(),
+                    ]);
+                    if (active) {
+                        const cartItems = cartRes?.data?.cart || [];
+                        setAddedToCart(cartItems.some((item) => item.productId === productId));
+                        const favList = favRes?.data?.favorites || [];
+                        setisFavorite(favList.some(f => String(f.productId) === String(productId)));
+                    }
                 } catch (err) {
-                    if (active) setAddedToCart(false);
+                    if (active) {
+                        setAddedToCart(false);
+                    }
                 }
             };
-            checkCartStatus();
+            checkCartAndFavorites();
             return () => { active = false; };
-        }, [productId])
-    );
-
-    // Check favorites status on screen focus - this ensures heart icon persists on refresh
-    useFocusEffect(
-        useCallback(() => {
-            const checkFavoriteStatus = async () => {
-                if (!productId || !auth?.currentUser) {
-                    setisFavorite(false);
-                    return;
-                }
-                try {
-                    const getFavorites = httpsCallable(functions, 'getFavorites');
-                    const favRes = await getFavorites();
-                    const favList = favRes?.data?.favorites || [];
-                    // Ensure proper string comparison for productId
-                    const isFav = favList.some(f => String(f.productId) === String(productId));
-                    setisFavorite(isFav);
-                } catch (e) {
-                    // Ignore favorites fetch error
-                }
-            };
-            checkFavoriteStatus();
         }, [productId])
     );
 
@@ -274,14 +263,21 @@ const ProductDetailScreen = () => {
         }
     }, [selectedPurity, product]);
 
+    // Treat as out of stock if inventory.inStock is false OR status is "out_of_stock"
+    const isOutOfStock = product && (
+        product.inventory?.inStock === false ||
+        product.status === "out_of_stock"
+    );
+
     return (
         <View style={{ flex: 1, backgroundColor: Colors.whiteColor }}>
             <MyStatusBar />
             <View style={{ flex: 1 }}>
                 {loading ? (
-                    <View style={styles.centerWrap}>
-                        <ActivityIndicator color={Colors.primaryColor} />
-                    </View>
+                    <>
+                        {header()}
+                        <ProductDetailShimmer />
+                    </>
                 ) : errorText ? (
                     <View style={styles.centerWrap}>
                         <Text style={styles.errorText}>{errorText}</Text>
@@ -324,6 +320,16 @@ const ProductDetailScreen = () => {
     }
 
     function addToCartButton() {
+        if (isOutOfStock) {
+            return (
+                <View style={[styles.bottomButtonContainer, { paddingBottom: Sizes.fixPadding + insets.bottom }]}>
+                    <View style={[styles.addToCartButton, { backgroundColor: Colors.lightGrayColor }]}>
+                        <Feather name="alert-circle" size={20} color={Colors.whiteColor} style={{ marginRight: 8 }} />
+                        <Text style={{ ...Fonts.whiteColor19Medium }}>Out of Stock</Text>
+                    </View>
+                </View>
+            );
+        }
         return (
             <View style={[styles.bottomButtonContainer, { paddingBottom: Sizes.fixPadding + insets.bottom }]}>
                 <TouchableOpacity
@@ -373,6 +379,11 @@ const ProductDetailScreen = () => {
                             />
                         )}
                     />
+                    {isOutOfStock && (
+                        <View style={styles.outOfStockBadge}>
+                            <Text style={{ ...Fonts.whiteColor16Medium, fontSize: 13 }}>Out of Stock</Text>
+                        </View>
+                    )}
                 </View>
                 <View style={styles.dotsWrap}>
                     {finalImages.map((_, idx) => (
@@ -1057,6 +1068,15 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         borderRadius: Sizes.fixPadding,
         padding: Sizes.fixPadding + 2.0,
+    },
+    outOfStockBadge: {
+        position: 'absolute',
+        top: 16,
+        left: 16,
+        backgroundColor: Colors.redColor,
+        paddingHorizontal: Sizes.fixPadding,
+        paddingVertical: 4,
+        borderRadius: 6,
     },
     // Collapsible Section Styles
     collapsibleSection: {

@@ -113,14 +113,20 @@ exports.createOrder = onCall({ region: "asia-south1", secrets: ["RAZORPAY_KEY_ID
 
   for (const item of items) {
     const productDoc = await db.collection("products").doc(item.productId).get();
-    if (!productDoc.exists || !productDoc.data().isActive) {
-      throw new HttpsError("not-found", `Product ${item.productId} not found or unavailable.`);
+    if (!productDoc.exists) {
+      throw new HttpsError("not-found", `Product ${item.productId} not found.`);
     }
 
     const product = productDoc.data();
 
-    // Check stock
-    if (!product.inventory?.inStock || (product.inventory?.quantity || 0) < (item.quantity || 1)) {
+    // Reject truly inactive/archived products (not out_of_stock — that has its own message)
+    if (!product.isActive && product.status !== "out_of_stock") {
+      throw new HttpsError("not-found", `Product ${product.name || item.productId} is no longer available.`);
+    }
+
+    // Check stock — treat as out of stock if status field OR inventory.inStock says so
+    const productIsOutOfStock = product.status === "out_of_stock" || product.inventory?.inStock === false;
+    if (productIsOutOfStock || (product.inventory?.quantity || 0) < (item.quantity || 1)) {
       throw new HttpsError("failed-precondition", `${product.name} is out of stock.`);
     }
 
@@ -355,12 +361,31 @@ exports.verifyPayment = onCall({ region: "asia-south1", secrets: ["RAZORPAY_KEY_
     updatedAt: admin.firestore.FieldValue.serverTimestamp(),
   });
 
-  // Deduct inventory
+  // Deduct inventory and auto-mark out of stock if quantity hits 0
   for (const item of orderData.items) {
-    await db.collection("products").doc(item.productId).update({
-      "inventory.quantity": admin.firestore.FieldValue.increment(-(item.quantity || 1)),
-      purchaseCount: admin.firestore.FieldValue.increment(item.quantity || 1),
-    });
+    const productRef = db.collection("products").doc(item.productId);
+    const productDoc = await productRef.get();
+    if (!productDoc.exists) continue;
+
+    const currentQty = productDoc.data().inventory?.quantity ?? 1;
+    const deductQty = item.quantity || 1;
+    const newQty = currentQty - deductQty;
+
+    const inventoryUpdate = {
+      "inventory.quantity": admin.firestore.FieldValue.increment(-deductQty),
+      purchaseCount: admin.firestore.FieldValue.increment(deductQty),
+    };
+
+    // Auto-mark out of stock when quantity reaches 0
+    // Keep isActive=true so product stays visible with OOS badge
+    if (newQty <= 0) {
+      inventoryUpdate["inventory.inStock"] = false;
+      inventoryUpdate["inventory.quantity"] = 0;
+      inventoryUpdate["status"] = "out_of_stock";
+      inventoryUpdate["isActive"] = true;
+    }
+
+    await productRef.update(inventoryUpdate);
   }
 
   // Clear user's cart
@@ -450,12 +475,30 @@ exports.updateOrderStatus = onCall({ region: "asia-south1" }, async (request) =>
       refundAmount: currentOrder.paymentStatus === "paid" ? currentOrder.orderSummary.totalAmount : 0,
     };
 
-    // Restore inventory
+    // Restore inventory and re-mark in stock if it was auto-marked out of stock
     for (const item of currentOrder.items) {
-      await db.collection("products").doc(item.productId).update({
-        "inventory.quantity": admin.firestore.FieldValue.increment(item.quantity || 1),
+      const productRef = db.collection("products").doc(item.productId);
+      const productDoc = await productRef.get();
+      if (!productDoc.exists) continue;
+
+      const productData = productDoc.data();
+      const currentQty = productData.inventory?.quantity ?? 0;
+      const restoreQty = item.quantity || 1;
+      const newQty = currentQty + restoreQty;
+
+      const restoreUpdate = {
+        "inventory.quantity": admin.firestore.FieldValue.increment(restoreQty),
         purchaseCount: admin.firestore.FieldValue.increment(-(item.quantity || 1)),
-      });
+      };
+
+      // If product was auto-marked out of stock due to 0 quantity, restore it
+      if (productData.status === "out_of_stock" && newQty > 0) {
+        restoreUpdate["inventory.inStock"] = true;
+        restoreUpdate["status"] = "active";
+        restoreUpdate["isActive"] = true;
+      }
+
+      await productRef.update(restoreUpdate);
     }
   }
 

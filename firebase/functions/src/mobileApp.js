@@ -26,7 +26,9 @@ function mapProductDoc(doc) {
     purchaseCount: data.purchaseCount || 0,
     isActive: data.isActive !== false,
     bestseller: data.bestseller || false,
-    newArrival: data.newArrival === true, // Only use admin-set flag
+    newArrival: data.newArrival === true,
+    status: data.status || "active",
+    inStock: data.status !== "out_of_stock" && (data.inventory?.inStock ?? true),
   };
 }
 
@@ -241,6 +243,7 @@ exports.getCart = onCall({ region: "asia-south1" }, async (request) => {
         name: product.name,
         image: product.images?.[0]?.url || "",
         finalPrice,
+        inStock: product.status !== "out_of_stock" && (product.inventory?.inStock ?? true),
       });
     }
   }
