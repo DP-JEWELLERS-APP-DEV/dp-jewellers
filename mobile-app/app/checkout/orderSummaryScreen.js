@@ -14,6 +14,68 @@ const placeholderImage = require('../../assets/images/jewellery/jewellary1.png')
 // Razorpay Key Id (public) - set in .env as EXPO_PUBLIC_RAZORPAY_KEY_ID
 const RAZORPAY_KEY = process.env.EXPO_PUBLIC_RAZORPAY_KEY_ID; // Use rzp_live_XXX for production
 
+/** Maps Razorpay / Firebase errors to copy users understand (codes vary by SDK version). */
+function describePaymentFailure(error) {
+    if (error == null) {
+        return { title: 'Payment failed', message: 'Something went wrong. Please try again.' };
+    }
+    const code = error.code;
+    if (code === 2 || code === '2') {
+        return {
+            title: 'Payment cancelled',
+            message: 'No payment was taken. Your cart is unchanged.',
+        };
+    }
+    const numeric = typeof code === 'number' ? code : parseInt(String(code), 10);
+    const razorpayByCode = {
+        0: 'Network issue. Check your connection and try again.',
+        1: 'Your bank or UPI app declined the payment. Try another method.',
+        3: 'Invalid payment details. Go back and try again.',
+        4: 'Bank declined the transaction. Contact your bank or use another card/UPI.',
+        5: 'Payment timed out. Please try again.',
+        6: 'OTP verification failed. Retry the payment.',
+    };
+    if (!Number.isNaN(numeric) && razorpayByCode[numeric]) {
+        return { title: "Payment couldn't complete", message: razorpayByCode[numeric] };
+    }
+    const msg = String(error.message || '');
+    const lower = msg.toLowerCase();
+    if (lower.includes('network') || lower.includes('internet') || lower.includes('connection')) {
+        return { title: 'Connection problem', message: 'Check your internet and try again.' };
+    }
+    if (code === 'functions/unavailable') {
+        return {
+            title: "Couldn't start payment",
+            message: msg || "We couldn't reach the payment provider. Check your connection and try again.",
+        };
+    }
+    if (code === 'functions/failed-precondition') {
+        if (lower.includes('out of stock') || lower.includes('stock')) {
+            return {
+                title: 'Item unavailable',
+                message: msg || 'Something in your cart is out of stock. Update the cart and try again.',
+            };
+        }
+        return {
+            title: "Couldn't place order",
+            message: msg || 'Please review your cart and try again.',
+        };
+    }
+    if (code === 'functions/internal') {
+        return {
+            title: "Couldn't start payment",
+            message: msg || 'Something went wrong on our side. Please try again.',
+        };
+    }
+    if (code === 'functions/unauthenticated') {
+        return { title: 'Session expired', message: 'Please sign in again and retry checkout.' };
+    }
+    return {
+        title: 'Payment failed',
+        message: msg || 'Something went wrong. Please try again.',
+    };
+}
+
 const OrderSummaryScreen = () => {
 
     const navigation = useNavigation();
@@ -186,13 +248,8 @@ const OrderSummaryScreen = () => {
                 });
             }
         } catch (error) {
-            if (error.code === 2) {
-                // User cancelled Razorpay
-                Alert.alert('Payment Cancelled', 'Payment was cancelled. Your order has not been placed.');
-            } else {
-                console.log('Payment error:', error);
-                Alert.alert('Payment Failed', error.message || 'Something went wrong with the payment. Please try again.');
-            }
+            const { title, message } = describePaymentFailure(error);
+            Alert.alert(title, message);
         } finally {
             setProcessingPayment(false);
         }

@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View, FlatList, Image, TouchableOpacity, ActivityIndicator } from 'react-native'
+import { StyleSheet, Text, View, FlatList, Image, TouchableOpacity } from 'react-native'
 import React, { useEffect, useState, useCallback } from 'react'
 import { Colors, CommomStyles, Fonts, Screen, Sizes } from '../../../constants/styles'
 import { MaterialIcons, Feather } from '@expo/vector-icons';
@@ -8,6 +8,7 @@ import { httpsCallable } from 'firebase/functions';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth, functions } from '../../../lib/firebase';
 import ProductCard from '../../../components/ProductCard';
+import { FavoriteScreenShimmer } from '../../../components/ShimmerPlaceholder';
 
 const FavoriteScreen = () => {
 
@@ -103,9 +104,7 @@ const FavoriteScreen = () => {
             <View style={{ flex: 1 }}>
                 {header()}
                 {loading ? (
-                    <View style={styles.centerWrap}>
-                        <ActivityIndicator color={Colors.primaryColor} />
-                    </View>
+                    <FavoriteScreenShimmer />
                 ) : errorText ? (
                     <View style={styles.centerWrap}>
                         <Text style={styles.errorText}>{errorText}</Text>

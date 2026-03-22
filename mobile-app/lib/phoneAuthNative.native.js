@@ -1,4 +1,8 @@
-import auth from '@react-native-firebase/auth';
+import {
+  getAuth,
+  verifyPhoneNumber,
+  PhoneAuthState,
+} from '@react-native-firebase/auth';
 
 /**
  * Send OTP via native Firebase Phone Auth.
@@ -7,14 +11,15 @@ import auth from '@react-native-firebase/auth';
  */
 export function sendPhoneOtpNative(phoneNumber) {
   return new Promise((resolve, reject) => {
-    auth().verifyPhoneNumber(phoneNumber).on(
+    const authInstance = getAuth();
+    verifyPhoneNumber(authInstance, phoneNumber).on(
       'state_changed',
       (snapshot) => {
-        if (snapshot.state === auth.PhoneAuthState.CODE_SENT) {
+        if (snapshot.state === PhoneAuthState.CODE_SENT) {
           resolve(snapshot.verificationId);
-        } else if (snapshot.state === auth.PhoneAuthState.AUTO_VERIFIED) {
+        } else if (snapshot.state === PhoneAuthState.AUTO_VERIFIED) {
           resolve(snapshot.verificationId);
-        } else if (snapshot.state === auth.PhoneAuthState.ERROR) {
+        } else if (snapshot.state === PhoneAuthState.ERROR) {
           reject(snapshot.error || new Error('Failed to send OTP. Please try again.'));
         }
       },

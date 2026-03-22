@@ -290,7 +290,23 @@ exports.createOrder = onCall({ region: "asia-south1", secrets: ["RAZORPAY_KEY_ID
     // Clean up the pending order if Razorpay fails
     await docRef.delete();
     logger.error("Razorpay order creation failed:", err);
-    throw new HttpsError("internal", "Failed to initiate payment. Please try again.");
+
+    // Razorpay REST shape: { statusCode, error: { code, description, field } }
+    const rz = err?.error || err?.response?.data?.error || {};
+    const rzDesc = (rz.description || rz.message || "").trim();
+    const rzCode = (rz.code || "").toString().toLowerCase();
+
+    let clientMsg = "We couldn't connect to the payment provider. Please try again in a moment.";
+    if (/authentication|bad_request|key/i.test(rzCode) || /key|auth|credential/i.test(rzDesc)) {
+      clientMsg = "Payment service misconfiguration. Please contact support.";
+    } else if (/amount|minimum|maximum|invalid amount/i.test(rzDesc)) {
+      clientMsg = rzDesc.length && rzDesc.length < 160 ? rzDesc : "This payment amount could not be processed. Try again or contact support.";
+    } else if (rzDesc && rzDesc.length > 0 && rzDesc.length < 200) {
+      clientMsg = rzDesc;
+    }
+
+    // unavailable = transient / third-party; client shows message without "internal" stigma
+    throw new HttpsError("unavailable", clientMsg);
   }
 
   return {

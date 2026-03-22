@@ -1,5 +1,6 @@
 import { StyleSheet, Text, View, Image, TextInput, ScrollView, TouchableOpacity, FlatList, ActivityIndicator, Platform } from 'react-native'
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
+import { useFocusEffect } from '@react-navigation/native'
 import { Colors, Fonts, Sizes, Screen } from '../../../constants/styles'
 import { Feather, MaterialIcons } from '@expo/vector-icons';
 import { useLocalSearchParams, useNavigation } from 'expo-router';
@@ -37,13 +38,15 @@ const SearchScreen = () => {
     const lastTrackedSearchRef = useRef('');
     const searchInputRef = useRef(null);
 
-    // Auto-focus the search input when the screen mounts so keyboard opens immediately
-    useEffect(() => {
-        const timeout = setTimeout(() => {
-            searchInputRef.current?.focus();
-        }, Platform.OS === 'android' ? 300 : 100);
-        return () => clearTimeout(timeout);
-    }, []);
+    // Focus on every visit — Search tab can stay mounted; mount-only useEffect would not run again.
+    useFocusEffect(
+        useCallback(() => {
+            const t = setTimeout(() => {
+                searchInputRef.current?.focus();
+            }, Platform.OS === 'android' ? 300 : 100);
+            return () => clearTimeout(t);
+        }, [])
+    );
 
     useEffect(() => {
         const material = params?.material ? String(params.material) : '';

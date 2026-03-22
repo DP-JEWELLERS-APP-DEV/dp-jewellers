@@ -1,11 +1,16 @@
-import { StyleSheet, Text, View, ScrollView, ActivityIndicator, TouchableOpacity, Image } from 'react-native'
+import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Image } from 'react-native'
 import React, { useEffect, useState } from 'react'
+import AsyncStorage from '@react-native-async-storage/async-storage'
 import { Colors, Fonts, Sizes, CommomStyles } from '../../constants/styles'
 import { MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons'
 import MyStatusBar from '../../components/myStatusBar'
 import { useNavigation, useRouter } from 'expo-router'
 import { httpsCallable } from 'firebase/functions'
 import { functions } from '../../lib/firebase'
+import { MetalRatesShimmer } from '../../components/ShimmerPlaceholder'
+
+const RATES_CACHE_KEY = 'dp_metal_rates_v1'
+const RATES_CACHE_TTL_MS = 10 * 60 * 1000
 
 const MetalRatesScreen = () => {
     const navigation = useNavigation()
@@ -15,20 +20,45 @@ const MetalRatesScreen = () => {
     const [errorText, setErrorText] = useState('')
 
     useEffect(() => {
-        const fetchRates = async () => {
-            setLoading(true)
+        let active = true
+        const run = async () => {
+            let fromCache = false
+            try {
+                const raw = await AsyncStorage.getItem(RATES_CACHE_KEY)
+                if (raw) {
+                    const { t, data } = JSON.parse(raw)
+                    if (Date.now() - t < RATES_CACHE_TTL_MS && data && active) {
+                        setRates(data)
+                        setLoading(false)
+                        fromCache = true
+                    }
+                }
+            } catch (_) { /* ignore */ }
+
+            if (!fromCache && active) setLoading(true)
             setErrorText('')
             try {
                 const getMetalRates = httpsCallable(functions, 'getMetalRates')
                 const res = await getMetalRates()
-                setRates(res?.data || null)
+                const data = res?.data || null
+                if (active) {
+                    setRates(data)
+                    if (data) {
+                        try {
+                            await AsyncStorage.setItem(RATES_CACHE_KEY, JSON.stringify({ t: Date.now(), data }))
+                        } catch (_) { /* ignore */ }
+                    }
+                }
             } catch (err) {
-                setErrorText('Failed to load metal rates.')
+                if (active && !fromCache) setErrorText('Failed to load metal rates.')
             } finally {
-                setLoading(false)
+                if (active) setLoading(false)
             }
         }
-        fetchRates()
+        run()
+        return () => {
+            active = false
+        }
     }, [])
 
     const formatCurrency = (value) => {
@@ -42,10 +72,8 @@ const MetalRatesScreen = () => {
             <MyStatusBar />
             <View style={{ flex: 1 }}>
                 {header()}
-                {loading ? (
-                    <View style={styles.centerWrap}>
-                        <ActivityIndicator color={Colors.primaryColor} />
-                    </View>
+                {loading && !rates ? (
+                    <MetalRatesShimmer />
                 ) : errorText ? (
                     <View style={styles.centerWrap}>
                         <Text style={styles.errorText}>{errorText}</Text>

@@ -1,5 +1,6 @@
-import { StyleSheet, Text, View, FlatList, Image, TouchableOpacity, ActivityIndicator } from 'react-native'
+import { StyleSheet, Text, View, FlatList, Image, TouchableOpacity } from 'react-native'
 import React, { useEffect, useState } from 'react'
+import AsyncStorage from '@react-native-async-storage/async-storage'
 import { Colors, Fonts, Sizes, Screen, CommomStyles } from '../../constants/styles'
 import { MaterialIcons, Feather } from '@expo/vector-icons';
 import MyStatusBar from '../../components/myStatusBar';
@@ -8,6 +9,22 @@ import { httpsCallable } from 'firebase/functions';
 import { functions } from '../../lib/firebase';
 import { Snackbar } from 'react-native-paper';
 import ProductCard from '../../components/ProductCard';
+import { CategoryProductsShimmer } from '../../components/ShimmerPlaceholder';
+
+const LIST_CACHE_TTL_MS = 5 * 60 * 1000;
+
+function listCacheKey(collectionId, categoryName, filters, featured, bestseller) {
+    const f = JSON.stringify({
+        material: filters.material,
+        purity: filters.purity,
+        goldColor: filters.goldColor,
+        diamond: filters.diamond,
+        minPrice: filters.minPrice,
+        maxPrice: filters.maxPrice,
+    });
+    if (collectionId) return `dp_plist:coll:${collectionId}`;
+    return `dp_plist:cat:${categoryName || 'all'}:f:${featured}:b:${bestseller}:${f}`;
+}
 
 const CategoryWiseProductsScreen = () => {
 
@@ -48,9 +65,27 @@ const CategoryWiseProductsScreen = () => {
 
     useEffect(() => {
         let active = true;
+        const featured = params.featured === 'true';
+        const bestseller = params.bestseller === 'true';
+        const cacheKey = listCacheKey(collectionId, categoryName, filters, featured, bestseller);
+
         const fetchProducts = async () => {
-            setloading(true);
             seterrorText('');
+            let usedCache = false;
+            try {
+                const raw = await AsyncStorage.getItem(cacheKey);
+                if (raw) {
+                    const { t, products: cached } = JSON.parse(raw);
+                    if (Date.now() - t < LIST_CACHE_TTL_MS && Array.isArray(cached) && active) {
+                        setitems(cached);
+                        setloading(false);
+                        usedCache = true;
+                    }
+                }
+            } catch (_) { /* ignore bad cache */ }
+
+            if (!usedCache && active) setloading(true);
+
             try {
                 let products = [];
                 if (collectionId) {
@@ -58,12 +93,11 @@ const CategoryWiseProductsScreen = () => {
                     const res = await getCustomCollectionProducts({ collectionId });
                     products = res?.data?.products || [];
                 } else {
-
                     const listProducts = httpsCallable(functions, 'listProducts');
                     const res = await listProducts({
                         category: categoryName !== 'undefined' ? categoryName : undefined,
-                        featured: params.featured === 'true',
-                        bestseller: params.bestseller === 'true',
+                        featured,
+                        bestseller,
                         material: filters.material || undefined,
                         purity: filters.purity || undefined,
                         goldColor: filters.goldColor || undefined,
@@ -87,12 +121,15 @@ const CategoryWiseProductsScreen = () => {
                 }
                 if (active) {
                     setitems(products);
+                    try {
+                        await AsyncStorage.setItem(cacheKey, JSON.stringify({ t: Date.now(), products }));
+                    } catch (_) { /* ignore */ }
                 }
             } catch (err) {
                 if (active) {
-                    console.error("Fetch Error: ", err);
+                    console.error('Fetch Error: ', err);
                     seterrorText(`Failed to load products: ${err.message}`);
-                    setitems([]);
+                    if (!usedCache) setitems([]);
                 }
             } finally {
                 if (active) setloading(false);
@@ -100,7 +137,7 @@ const CategoryWiseProductsScreen = () => {
         };
         fetchProducts();
         return () => { active = false; };
-    }, [collectionId, categoryName, filters.material, filters.purity, filters.goldColor, filters.diamond, filters.minPrice, filters.maxPrice]);
+    }, [collectionId, categoryName, filters.material, filters.purity, filters.goldColor, filters.diamond, filters.minPrice, filters.maxPrice, params.featured, params.bestseller]);
 
     const handleShowSnackBar = (text) => {
         setSnackText(text);
@@ -112,10 +149,8 @@ const CategoryWiseProductsScreen = () => {
             <MyStatusBar />
             <View style={{ flex: 1 }}>
                 {header()}
-                {loading ? (
-                    <View style={styles.centerWrap}>
-                        <ActivityIndicator color={Colors.primaryColor} />
-                    </View>
+                {loading && items.length === 0 ? (
+                    <CategoryProductsShimmer />
                 ) : errorText ? (
                     <View style={styles.centerWrap}>
                         <Text style={styles.errorText}>{errorText}</Text>

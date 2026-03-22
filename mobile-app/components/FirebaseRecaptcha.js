@@ -1,7 +1,10 @@
 import React, { forwardRef, useImperativeHandle, useState, useRef } from 'react';
 import { View, Modal, ActivityIndicator, StyleSheet, Text, TouchableOpacity } from 'react-native';
 import { WebView } from 'react-native-webview';
-import auth from '@react-native-firebase/auth';
+import {
+  getAuth as getNativeAuth,
+  signInWithPhoneNumber as nativeSignInWithPhoneNumber,
+} from '@react-native-firebase/auth';
 
 const FirebaseRecaptcha = forwardRef(({ firebaseConfig, onVerify, onError, hideUI = false }, ref) => {
   const [modalVisible, setModalVisible] = useState(false);
@@ -80,7 +83,12 @@ const FirebaseRecaptcha = forwardRef(({ firebaseConfig, onVerify, onError, hideU
       console.log('[Auth Strategy]: Attempting Native SDK first...');
       try {
         // Try native first (Fastest)
-        const confirmation = await auth().signInWithPhoneNumber(phoneNumber);
+        // Modular API (v22+) — avoids namespaced auth() deprecation warnings
+        const confirmation = await nativeSignInWithPhoneNumber(
+          getNativeAuth(),
+          phoneNumber,
+          undefined,
+        );
         console.log('[Native SDK]: Success');
         if (onVerify) onVerify(confirmation.verificationId);
         return confirmation.verificationId;

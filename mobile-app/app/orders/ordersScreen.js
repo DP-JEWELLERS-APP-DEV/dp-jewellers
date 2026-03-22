@@ -1,5 +1,6 @@
-import { StyleSheet, Text, View, FlatList, TouchableOpacity, Image, ActivityIndicator, RefreshControl } from 'react-native'
-import React, { useState, useEffect, useCallback } from 'react'
+import { StyleSheet, Text, View, FlatList, TouchableOpacity, Image, RefreshControl } from 'react-native'
+import React, { useState, useCallback } from 'react'
+import AsyncStorage from '@react-native-async-storage/async-storage'
 import { Colors, Fonts, Sizes, CommomStyles } from '../../constants/styles'
 import { MaterialIcons } from '@expo/vector-icons';
 import MyStatusBar from '../../components/myStatusBar';
@@ -7,6 +8,9 @@ import { useNavigation, useRouter, useFocusEffect } from 'expo-router';
 import { httpsCallable } from 'firebase/functions';
 import { functions } from '../../lib/firebase';
 import { OrdersScreenShimmer } from '../../components/ShimmerPlaceholder';
+
+const ORDERS_CACHE_KEY = 'dp_user_orders_v1';
+const ORDERS_CACHE_TTL_MS = 2 * 60 * 1000;
 
 const OrdersScreen = () => {
 
@@ -18,30 +22,79 @@ const OrdersScreen = () => {
     const [refreshing, setRefreshing] = useState(false);
     const [error, setError] = useState('');
 
+    const loadOrdersFromApi = async () => {
+        const getUserOrders = httpsCallable(functions, 'getUserOrders');
+        const res = await getUserOrders({});
+        return res?.data?.orders || [];
+    };
+
     useFocusEffect(
         useCallback(() => {
-            fetchOrders();
+            let alive = true;
+            (async () => {
+                try {
+                    const raw = await AsyncStorage.getItem(ORDERS_CACHE_KEY);
+                    if (raw) {
+                        const p = JSON.parse(raw);
+                        if (Date.now() - p.t < ORDERS_CACHE_TTL_MS && Array.isArray(p.orders) && alive) {
+                            setOrders(p.orders);
+                            setLoading(false);
+                        }
+                    }
+                } catch (_) { /* ignore */ }
+
+                setError('');
+                try {
+                    const list = await loadOrdersFromApi();
+                    if (!alive) return;
+                    setOrders(list);
+                    try {
+                        await AsyncStorage.setItem(ORDERS_CACHE_KEY, JSON.stringify({ t: Date.now(), orders: list }));
+                    } catch (_) { /* ignore */ }
+                } catch (err) {
+                    if (alive) {
+                        console.log('Error fetching orders:', err);
+                        setError('Failed to load orders. Please try again.');
+                    }
+                } finally {
+                    if (alive) {
+                        setLoading(false);
+                        setRefreshing(false);
+                    }
+                }
+            })();
+            return () => {
+                alive = false;
+            };
         }, [])
     );
 
-    const fetchOrders = async () => {
-        try {
-            setError('');
-            const getUserOrders = httpsCallable(functions, 'getUserOrders');
-            const res = await getUserOrders({});
-            setOrders(res?.data?.orders || []);
-        } catch (err) {
-            console.log('Error fetching orders:', err);
-            setError('Failed to load orders. Please try again.');
-        } finally {
-            setLoading(false);
-            setRefreshing(false);
-        }
-    };
-
     const onRefresh = () => {
         setRefreshing(true);
-        fetchOrders();
+        setError('');
+        loadOrdersFromApi()
+            .then(async (list) => {
+                setOrders(list);
+                try {
+                    await AsyncStorage.setItem(ORDERS_CACHE_KEY, JSON.stringify({ t: Date.now(), orders: list }));
+                } catch (_) { /* ignore */ }
+            })
+            .catch(() => setError('Failed to load orders. Please try again.'))
+            .finally(() => setRefreshing(false));
+    };
+
+    const retryLoad = () => {
+        setLoading(true);
+        setError('');
+        loadOrdersFromApi()
+            .then(async (list) => {
+                setOrders(list);
+                try {
+                    await AsyncStorage.setItem(ORDERS_CACHE_KEY, JSON.stringify({ t: Date.now(), orders: list }));
+                } catch (_) { /* ignore */ }
+            })
+            .catch(() => setError('Failed to load orders. Please try again.'))
+            .finally(() => setLoading(false));
     };
 
     const formatDate = (dateValue) => {
@@ -121,7 +174,7 @@ const OrdersScreen = () => {
                 {error ? (
                     <View style={styles.centerWrap}>
                         <Text style={styles.errorText}>{error}</Text>
-                        <TouchableOpacity onPress={fetchOrders} style={styles.retryButton}>
+                        <TouchableOpacity onPress={retryLoad} style={styles.retryButton}>
                             <Text style={{ ...Fonts.primaryColor16Medium }}>Retry</Text>
                         </TouchableOpacity>
                     </View>

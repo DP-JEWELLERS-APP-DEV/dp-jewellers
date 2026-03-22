@@ -178,6 +178,30 @@ export const SearchScreenShimmer = () => (
     </View>
 );
 
+/** Wishlist / category listing: 2-column product grid */
+export const FavoriteScreenShimmer = () => (
+    <View style={{ flex: 1, backgroundColor: Colors.whiteColor, paddingHorizontal: Sizes.fixPadding, paddingTop: Sizes.fixPadding * 2.0 }}>
+        <View style={styles.gridRow}>
+            {[1, 2].map(i => <Shimmer key={i} style={styles.productCard} />)}
+        </View>
+        <View style={styles.gridRow}>
+            {[1, 2].map(i => <Shimmer key={i} style={styles.productCard} />)}
+        </View>
+        <View style={styles.gridRow}>
+            {[1, 2].map(i => <Shimmer key={i} style={styles.productCard} />)}
+        </View>
+    </View>
+);
+
+export const CategoryProductsShimmer = FavoriteScreenShimmer;
+
+export const MetalRatesShimmer = () => (
+    <View style={{ flex: 1, backgroundColor: Colors.whiteColor, paddingHorizontal: Sizes.fixPadding * 2.0, paddingTop: Sizes.fixPadding * 2.0 }}>
+        <Shimmer style={{ height: 22, width: '70%', borderRadius: 6, marginBottom: Sizes.fixPadding * 2.0 }} />
+        <Shimmer style={{ height: 280, borderRadius: Sizes.fixPadding, marginBottom: Sizes.fixPadding }} />
+    </View>
+);
+
 export const DeliveryMethodShimmer = () => (
     <View style={{ flex: 1, backgroundColor: Colors.whiteColor, padding: Sizes.fixPadding * 2.0 }}>
         <Shimmer style={{ ...styles.textLineLong, marginBottom: Sizes.fixPadding * 2.0 }} />
