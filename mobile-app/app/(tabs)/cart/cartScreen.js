@@ -392,7 +392,7 @@ const styles = StyleSheet.create({
         resizeMode: 'contain',
     },
     loginButton: {
-        backgroundColor: Colors.blackColor,
+        backgroundColor: Colors.primaryColor,
         paddingHorizontal: Sizes.fixPadding * 4,
         paddingVertical: Sizes.fixPadding + 2,
         borderRadius: Sizes.fixPadding,

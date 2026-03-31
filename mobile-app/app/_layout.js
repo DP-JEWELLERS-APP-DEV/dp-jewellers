@@ -3,7 +3,7 @@ import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import Constants from 'expo-constants';
 import { useEffect, useState } from 'react';
-import { AppState, LogBox, StatusBar, Modal, View, Text, TouchableOpacity, StyleSheet, Linking, Platform, Image } from 'react-native';
+import { AppState, InteractionManager, LogBox, StatusBar, Modal, View, Text, TouchableOpacity, StyleSheet, Linking, Platform, Image } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 const PLAY_STORE_PACKAGE = 'com.render.rnexpo_jewelleryempire';
@@ -68,25 +68,38 @@ export default function RootLayout() {
     };
   }, [loaded]);
 
-  // Check for app updates on launch (pure-JS, no native module needed)
+  // Defer Play Store scrape until after first paint — avoids competing with startup (fonts, RN, Firebase).
   useEffect(() => {
-    const checkUpdate = async () => {
-      try {
-        const currentVersion = Constants.expoConfig?.version || Constants.manifest?.version;
-        if (!currentVersion) return;
-        const latestVersion = await getPlayStoreLatestVersion();
-        if (latestVersion && isNewer(latestVersion, currentVersion)) {
-          setUpdateInfo({
-            storeUrl: PLAY_STORE_URL,
-            latestVersion,
-            currentVersion,
-          });
+    let cancelled = false;
+    let delayTimer = null;
+    const run = () => {
+      if (cancelled) return;
+      (async () => {
+        try {
+          const currentVersion = Constants.expoConfig?.version || Constants.manifest?.version;
+          if (!currentVersion) return;
+          const latestVersion = await getPlayStoreLatestVersion();
+          if (cancelled) return;
+          if (latestVersion && isNewer(latestVersion, currentVersion)) {
+            setUpdateInfo({
+              storeUrl: PLAY_STORE_URL,
+              latestVersion,
+              currentVersion,
+            });
+          }
+        } catch {
+          // Silently ignore — no update info if check fails (e.g. no network)
         }
-      } catch {
-        // Silently ignore — no update info if check fails (e.g. no network)
-      }
+      })();
     };
-    checkUpdate();
+    const handle = InteractionManager.runAfterInteractions(() => {
+      delayTimer = setTimeout(run, 2500);
+    });
+    return () => {
+      cancelled = true;
+      if (delayTimer) clearTimeout(delayTimer);
+      handle?.cancel?.();
+    };
   }, []);
 
   const handleUpdate = () => {

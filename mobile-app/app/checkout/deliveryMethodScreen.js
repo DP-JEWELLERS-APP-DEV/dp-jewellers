@@ -171,7 +171,7 @@ const styles = StyleSheet.create({
         marginBottom: Sizes.fixPadding * 2.0,
     },
     optionWrapSelected: {
-        borderColor: Colors.blackColor,
+        borderColor: Colors.primaryColor,
         backgroundColor: Colors.offWhiteColor,
     },
     iconWrap: {
@@ -183,7 +183,7 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     iconWrapSelected: {
-        backgroundColor: Colors.blackColor,
+        backgroundColor: Colors.primaryColor,
     },
     radioOuter: {
         width: 22,
@@ -195,13 +195,13 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     radioOuterSelected: {
-        borderColor: Colors.blackColor,
+        borderColor: Colors.primaryColor,
     },
     radioInner: {
         width: 12,
         height: 12,
         borderRadius: 6,
-        backgroundColor: Colors.blackColor,
+        backgroundColor: Colors.primaryColor,
     },
     cartTotalWrap: {
         flexDirection: 'row',

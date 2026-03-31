@@ -1,0 +1,50 @@
+diff --git a/node_modules/react-native/ReactAndroid/src/main/java/com/facebook/react/modules/statusbar/StatusBarModule.kt b/node_modules/react-native/ReactAndroid/src/main/java/com/facebook/react/modules/statusbar/StatusBarModule.kt
+index dbae14c..d7ef9fc 100644
+--- a/node_modules/react-native/ReactAndroid/src/main/java/com/facebook/react/modules/statusbar/StatusBarModule.kt
++++ b/node_modules/react-native/ReactAndroid/src/main/java/com/facebook/react/modules/statusbar/StatusBarModule.kt
+@@ -36,9 +36,14 @@ internal class StatusBarModule(reactContext: ReactApplicationContext?) :
+   override fun getTypedExportedConstants(): Map<String, Any> {
+     val currentActivity = reactApplicationContext.currentActivity
+     val statusBarColor =
+-        currentActivity?.window?.statusBarColor?.let { color ->
+-          String.format("#%06X", 0xFFFFFF and color)
+-        } ?: "black"
++        if (isEdgeToEdgeFeatureFlagOn) {
++          // Avoid deprecated Window#getStatusBarColor when edge-to-edge is enabled (Android 15+ lint / Play).
++          "#00000000"
++        } else {
++          currentActivity?.window?.statusBarColor?.let { color ->
++            String.format("#%06X", 0xFFFFFF and color)
++          } ?: "black"
++        }
+     return mapOf(
+         HEIGHT_KEY to PixelUtil.toDIPFromPixel(getStatusBarHeightPx(currentActivity).toFloat()),
+         DEFAULT_BACKGROUND_COLOR_KEY to statusBarColor,
+diff --git a/node_modules/react-native/ReactAndroid/src/main/java/com/facebook/react/views/view/WindowUtil.kt b/node_modules/react-native/ReactAndroid/src/main/java/com/facebook/react/views/view/WindowUtil.kt
+index 60f2a94..cf495bf 100644
+--- a/node_modules/react-native/ReactAndroid/src/main/java/com/facebook/react/views/view/WindowUtil.kt
++++ b/node_modules/react-native/ReactAndroid/src/main/java/com/facebook/react/views/view/WindowUtil.kt
+@@ -112,13 +112,16 @@ internal fun Window.enableEdgeToEdge() {
+     isNavigationBarContrastEnforced = true
+   }
+ 
+-  statusBarColor = Color.TRANSPARENT
+-  navigationBarColor =
+-      when {
+-        Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q -> Color.TRANSPARENT
+-        Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !isDarkMode -> LightNavigationBarColor
+-        else -> DarkNavigationBarColor
+-      }
++  // API 35+: avoid deprecated Window#setStatusBarColor / setNavigationBarColor; decor + insets are enough.
++  if (Build.VERSION.SDK_INT < 35) {
++    statusBarColor = Color.TRANSPARENT
++    navigationBarColor =
++        when {
++          Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q -> Color.TRANSPARENT
++          Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !isDarkMode -> LightNavigationBarColor
++          else -> DarkNavigationBarColor
++        }
++  }
+ 
+   WindowInsetsControllerCompat(this, decorView).run {
+     isAppearanceLightNavigationBars = !isDarkMode

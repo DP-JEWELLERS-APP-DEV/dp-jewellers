@@ -70,10 +70,10 @@ const ContactUsScreen = () => {
 
     return (
         <View style={{ flex: 1, backgroundColor: Colors.whiteColor }}>
-            <SafeAreaView style={{ backgroundColor: Colors.blackColor }}>
+            <SafeAreaView style={{ backgroundColor: Colors.primaryColor }}>
                 <StatusBar
                     translucent={false}
-                    backgroundColor={Colors.blackColor}
+                    backgroundColor={Colors.primaryColor}
                     barStyle={"light-content"}
                 />
             </SafeAreaView>
@@ -90,7 +90,7 @@ const ContactUsScreen = () => {
 
     function backArrow() {
         return (
-            <View style={{ backgroundColor: Colors.blackColor, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Sizes.fixPadding * 2.0, paddingTop: Sizes.fixPadding * 2.0, paddingBottom: Sizes.fixPadding }}>
+            <View style={{ backgroundColor: Colors.primaryColor, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Sizes.fixPadding * 2.0, paddingTop: Sizes.fixPadding * 2.0, paddingBottom: Sizes.fixPadding }}>
                 <MaterialIcons
                     name="keyboard-backspace"
                     size={26}
@@ -227,7 +227,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         paddingBottom: Sizes.fixPadding * 4.0,
         paddingHorizontal: Sizes.fixPadding * 4.0,
-        backgroundColor: Colors.blackColor
+        backgroundColor: Colors.primaryColor
     },
     infoWrapStyle: {
         ...Fonts.blackColor16Regular,

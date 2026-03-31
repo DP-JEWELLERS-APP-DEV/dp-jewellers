@@ -2,7 +2,7 @@
   "expo": {
     "name": "DP Jewellers",
     "slug": "pn-rn-JewelleryEmpire",
-    "version": "1.0.4",
+    "version": "1.0.7",
     "orientation": "portrait",
     "icon": "./assets/images/apk-logo.png",
     "scheme": "myapp",
@@ -16,7 +16,7 @@
     "android": {
       "package": "com.render.rnexpo_jewelleryempire",
       "googleServicesFile": "./google-services.json",
-      "versionCode": 5,
+      "versionCode": 8,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/apk-logo-android.png",
         "backgroundColor": "#ffffff"

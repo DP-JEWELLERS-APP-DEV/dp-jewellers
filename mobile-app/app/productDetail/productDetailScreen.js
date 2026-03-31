@@ -1062,7 +1062,7 @@ const styles = StyleSheet.create({
         borderTopWidth: 1.0,
     },
     addToCartButton: {
-        backgroundColor: Colors.blackColor,
+        backgroundColor: Colors.primaryColor,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',

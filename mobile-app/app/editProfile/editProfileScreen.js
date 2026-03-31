@@ -278,7 +278,7 @@ const styles = StyleSheet.create({
         width: Screen.width / 11.0,
         height: Screen.width / 11.0,
         borderRadius: (Screen.width / 11.0) / 2.0,
-        backgroundColor: Colors.blackColor,
+        backgroundColor: Colors.primaryColor,
         position: 'absolute', right: 0.0,
         bottom: 0.0,
         elevation: 3.0,

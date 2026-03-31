@@ -29,12 +29,12 @@ const HOME_CACHE_KEY = 'home_cache_v2';
 
 const SignatureHeader = ({ title, subtitle, onPress }) => {
     return (
-        <View style={{ width: '100%', paddingHorizontal: Sizes.fixPadding, alignItems: 'center', marginBottom: Sizes.fixPadding, marginTop: Sizes.fixPadding }}>
-            <Text style={{ ...Fonts.blackColor18SemiBold, fontSize: 19.0, letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 2.0, textAlign: 'center' }}>
+        <View style={{ width: '100%', paddingHorizontal: Sizes.fixPadding, alignItems: 'center', marginBottom: Sizes.fixPadding, marginTop: Sizes.fixPadding + 2.0 }}>
+            <Text style={{ ...Fonts.blackColor18SemiBold, fontSize: 18.0, letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 3.0, textAlign: 'center' }}>
                 {title}
             </Text>
             {subtitle && (
-                <Text numberOfLines={1} adjustsFontSizeToFit style={{ ...Fonts.blackColor14Medium, fontSize: 12.0, lineHeight: 18.0, textAlign: 'center', fontStyle: 'italic', letterSpacing: 0.2, marginBottom: 5.0, width: '90%' }}>
+                <Text numberOfLines={1} adjustsFontSizeToFit style={{ ...Fonts.blackColor14Medium, fontSize: 12.0, lineHeight: 18.0, textAlign: 'center', fontStyle: 'italic', letterSpacing: 0.2, marginBottom: 7.0, width: '90%' }}>
                     {subtitle}
                 </Text>
             )}
@@ -43,12 +43,12 @@ const SignatureHeader = ({ title, subtitle, onPress }) => {
                     activeOpacity={0.7}
                     onPress={onPress}
                     style={{
-                        marginTop: 5.0,
+                        marginTop: 4.0,
                         paddingVertical: 6.0,
-                        paddingHorizontal: 15.0,
+                        paddingHorizontal: 16.0,
                         borderWidth: 1.0,
                         borderColor: '#D4AF37', // Gold
-                        borderRadius: 20.0,
+                        borderRadius: 22.0,
                     }}
                 >
                     <Text style={{ ...Fonts.blackColor14Medium, fontSize: 11.0, letterSpacing: 1.0, textTransform: 'uppercase', color: '#D4AF37' }}>
@@ -56,7 +56,7 @@ const SignatureHeader = ({ title, subtitle, onPress }) => {
                     </Text>
                 </TouchableOpacity>
             )}
-            <View style={{ flexDirection: 'row', alignItems: 'center', width: '75%', marginTop: 10.0 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', width: '70%', marginTop: 10.0 }}>
                 <View style={{ flex: 1, height: 1.5, backgroundColor: '#E0E0E0' }} />
                 <Image
                     source={require('../../../assets/images/icon.png')}
@@ -483,7 +483,7 @@ const HomeScreen = () => {
             </TouchableOpacity>
         )
         return (
-            <View style={{ marginVertical: Sizes.fixPadding }}>
+            <View style={{ marginTop: Sizes.fixPadding, marginBottom: Sizes.fixPadding }}>
 
                 <FlatList
                     data={categories}
@@ -512,27 +512,27 @@ const HomeScreen = () => {
 
         const itemWidth = Screen.width;
         const cardWidth = Screen.width - 40.0;
-        const itemHeight = 290.0;
+        const itemHeight = 260.0;
 
         const renderItem = ({ item }) => (
             <View style={{ width: itemWidth, height: itemHeight, alignItems: 'center' }}>
                 <ImageBackground
                     source={{ uri: item.imageUrl }}
                     style={{ width: cardWidth, height: itemHeight, backgroundColor: Colors.offWhiteColor }}
-                    borderRadius={Sizes.fixPadding}
+                    borderRadius={Sizes.fixPadding + 2.0}
                     fadeDuration={300}
                 >
                     <View style={{
                         flex: 1,
-                        backgroundColor: 'rgba(0,0,0,0.35)', // Dark overlay for text visibility
-                        borderRadius: Sizes.fixPadding,
+                        backgroundColor: 'rgba(0,0,0,0.33)',
+                        borderRadius: Sizes.fixPadding + 2.0,
                         justifyContent: 'flex-end',
                         paddingHorizontal: Sizes.fixPadding * 2.0,
-                        paddingBottom: Sizes.fixPadding * 2.0
+                        paddingBottom: Sizes.fixPadding * 1.8
                     }}>
                         <Text
                             numberOfLines={2}
-                            style={{ ...Fonts.whiteColor22Bold, lineHeight: 30.0, marginBottom: Sizes.fixPadding, textShadowColor: 'rgba(0, 0, 0, 0.75)', textShadowOffset: { width: -1, height: 1 }, textShadowRadius: 10 }}
+                            style={{ ...Fonts.whiteColor22Bold, fontSize: 20, lineHeight: 28.0, marginBottom: Sizes.fixPadding - 1.0, textShadowColor: 'rgba(0, 0, 0, 0.75)', textShadowOffset: { width: -1, height: 1 }, textShadowRadius: 10 }}
                         >
                             {item.title}
                         </Text>
@@ -543,9 +543,9 @@ const HomeScreen = () => {
                                 backgroundColor: Colors.whiteColor,
                                 paddingVertical: Sizes.fixPadding - 5.0,
                                 paddingHorizontal: Sizes.fixPadding * 2.0,
-                                borderRadius: 30.0,
+                                borderRadius: 22.0,
                                 alignSelf: 'flex-start',
-                                marginBottom: Sizes.fixPadding
+                                marginBottom: Sizes.fixPadding - 1.0
                             }}
                         >
                             <Text style={{ ...Fonts.blackColor15Medium, letterSpacing: 0.5 }}>
@@ -603,7 +603,7 @@ const HomeScreen = () => {
                     onPress={() => navigation.push('metalRates/metalRatesScreen')}
                     style={styles.headerPriceBtn}
                 >
-                    <Text style={styles.headerPriceText}>View Price</Text>
+                    <Text style={styles.headerPriceText}>View Rates</Text>
                 </TouchableOpacity>
             </View>
         )
@@ -649,8 +649,8 @@ const styles = StyleSheet.create({
         paddingVertical: 12,
         borderRadius: 30,
         borderWidth: 1.2,
-        borderColor: '#E0E0E0',
-        backgroundColor: 'transparent',
+        borderColor: '#E8DDC7',
+        backgroundColor: '#FFFDF8',
     },
     searchBarText: {
         ...Fonts.grayColor15Regular,
@@ -660,15 +660,17 @@ const styles = StyleSheet.create({
         letterSpacing: 0.3,
     },
     headerPriceBtn: {
-        paddingVertical: 4,
-        paddingHorizontal: 8,
-        borderRadius: 6,
+        paddingVertical: 6,
+        paddingHorizontal: 12,
+        borderRadius: 16,
         borderWidth: 1,
-        borderColor: Colors.offWhiteColor,
+        borderColor: '#E9DFC9',
+        backgroundColor: '#FFF8E8',
         marginRight: Sizes.fixPadding,
     },
     headerPriceText: {
         ...Fonts.blackColor14Medium,
+        letterSpacing: 0.2,
     },
     getNowButtonStyle: {
         backgroundColor: Colors.whiteColor,
@@ -678,19 +680,27 @@ const styles = StyleSheet.create({
         alignSelf: 'flex-start',
     },
     categoryWiseItemWrapStyle: {
-        borderColor: Colors.offWhiteColor,
+        borderColor: '#EEE2CC',
         borderWidth: 1.0,
-        borderRadius: Sizes.fixPadding,
+        borderRadius: Sizes.fixPadding + 2.0,
         padding: 0,
         marginHorizontal: Sizes.fixPadding,
         alignItems: 'center',
         overflow: 'hidden',
+        backgroundColor: Colors.whiteColor,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 6,
+        elevation: 1,
     },
     categoryWiseJewellaryTextStyle: {
         maxWidth: Screen.width / 4.5,
         textAlign: 'center',
         ...Fonts.blackColor16Medium,
-        marginTop: Sizes.fixPadding
+        fontSize: 15,
+        marginTop: Sizes.fixPadding - 1.0,
+        marginBottom: Sizes.fixPadding - 1.0,
     },
     centerWrap: {
         flex: 1,

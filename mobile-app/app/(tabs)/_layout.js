@@ -110,9 +110,20 @@ export default function TabLayout() {
         screenOptions={{
           headerShown: false,
           tabBarActiveTintColor: Colors.whiteColor,
-          tabBarInactiveTintColor: Colors.whiteColor,
+          tabBarInactiveTintColor: 'rgba(255,255,255,0.78)',
           tabBarShowLabel: false,
-          tabBarStyle: { height: 60.0 + insets.bottom, backgroundColor: Colors.blackColor, paddingTop: Sizes.fixPadding, paddingBottom: insets.bottom },
+          tabBarStyle: {
+            height: 66.0 + insets.bottom,
+            backgroundColor: Colors.primaryColor,
+            paddingTop: 10,
+            paddingBottom: Math.max(insets.bottom, 8),
+            borderTopWidth: 1,
+            borderTopColor: '#1E337A',
+            elevation: 0,
+          },
+          tabBarItemStyle: {
+            paddingVertical: 2,
+          },
           tabBarHideOnKeyboard: true,
         }}
       >
@@ -121,7 +132,7 @@ export default function TabLayout() {
           name="home/homeScreen"
           options={{
             tabBarIcon: ({ focused, color }) => (
-              <View style={{ alignItems: 'center' }}>
+              <View style={styles.tabIconWrap}>
                 <Feather name="home" size={22} color={color} />
                 {focused ? <View style={styles.dotStyle} /> : null}
               </View>
@@ -147,7 +158,7 @@ export default function TabLayout() {
           name="cart/cartScreen"
           options={{
             tabBarIcon: ({ focused, color }) => (
-              <View style={{ alignItems: 'center' }}>
+              <View style={styles.tabIconWrap}>
                 <View>
                   <MaterialCommunityIcons name="shopping-outline" size={24} color={color} />
                   {cartCount > 0 && (
@@ -165,7 +176,7 @@ export default function TabLayout() {
           name="favorite/favoriteScreen"
           options={{
             tabBarIcon: ({ focused, color }) => (
-              <View style={{ alignItems: 'center' }}>
+              <View style={styles.tabIconWrap}>
                 <View>
                   <Feather name="heart" size={22} color={color} />
                   {favoritesCount > 0 && (
@@ -183,7 +194,7 @@ export default function TabLayout() {
           name="profile/profileScreen"
           options={{
             tabBarIcon: ({ focused, color }) => (
-              <View style={{ alignItems: 'center' }}>
+              <View style={styles.tabIconWrap}>
                 <Feather name="user" size={22} color={color} />
                 {focused ? <View style={styles.dotStyle} /> : null}
               </View>
@@ -207,12 +218,17 @@ export default function TabLayout() {
 }
 
 const styles = StyleSheet.create({
+  tabIconWrap: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 44,
+  },
   dotStyle: {
     backgroundColor: Colors.whiteColor,
-    width: 6.0,
-    height: 6.0,
+    width: 18.0,
+    height: 3.0,
     borderRadius: 3.0,
-    marginTop: Sizes.fixPadding - 5.0
+    marginTop: 5.0
   },
   exitWrapStyle: {
     backgroundColor: Colors.blackColor,

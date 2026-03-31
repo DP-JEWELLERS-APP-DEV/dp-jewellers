@@ -567,7 +567,7 @@ const styles = StyleSheet.create({
         marginBottom: Sizes.fixPadding,
     },
     paymentOptionSelected: {
-        borderColor: Colors.blackColor,
+        borderColor: Colors.primaryColor,
         backgroundColor: Colors.offWhiteColor,
     },
     radioOuter: {
@@ -580,20 +580,20 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     radioOuterSelected: {
-        borderColor: Colors.blackColor,
+        borderColor: Colors.primaryColor,
     },
     radioInner: {
         width: 12,
         height: 12,
         borderRadius: 6,
-        backgroundColor: Colors.blackColor,
+        backgroundColor: Colors.primaryColor,
     },
     customAmountWrap: {
         flexDirection: 'row',
         alignItems: 'center',
         marginTop: Sizes.fixPadding,
         borderBottomWidth: 1.0,
-        borderBottomColor: Colors.blackColor,
+        borderBottomColor: Colors.primaryColor,
         paddingBottom: Sizes.fixPadding - 5.0,
     },
     customAmountInput: {

@@ -222,7 +222,7 @@ const styles = StyleSheet.create({
     profileInfoWrapStyle: {
         alignItems: 'center',
         paddingVertical: Sizes.fixPadding * 2.0,
-        borderBottomColor: Colors.offWhiteColor,
+        borderBottomColor: '#EFE5D3',
         borderBottomWidth: 1.0,
         marginBottom: Sizes.fixPadding,
     },
@@ -246,14 +246,20 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     profileOptionWrapStyle: {
-        borderColor: Colors.offWhiteColor,
+        borderColor: '#E9DFC9',
         borderWidth: 1.0,
-        borderRadius: Sizes.fixPadding,
+        borderRadius: Sizes.fixPadding + 2.0,
         flexDirection: 'row',
         alignItems: 'center',
         marginHorizontal: Sizes.fixPadding * 2.0,
         marginBottom: Sizes.fixPadding + 6.0,
-        padding: Sizes.fixPadding + 5.0
+        padding: Sizes.fixPadding + 4.0,
+        backgroundColor: '#FFFDF7',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.04,
+        shadowRadius: 6,
+        elevation: 1,
     },
     cancelAndYesButtonStyle: {
         flex: 1,

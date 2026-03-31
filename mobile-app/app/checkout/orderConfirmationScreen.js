@@ -125,7 +125,7 @@ const OrderConfirmationScreen = () => {
                 <TouchableOpacity
                     activeOpacity={0.8}
                     onPress={() => router.replace('/(tabs)/home/homeScreen')}
-                    style={[CommomStyles.buttonStyle, { backgroundColor: Colors.whiteColor, borderWidth: 1.5, borderColor: Colors.blackColor, marginTop: Sizes.fixPadding }]}
+                    style={[CommomStyles.buttonStyle, { backgroundColor: Colors.whiteColor, borderWidth: 1.5, borderColor: Colors.primaryColor, marginTop: Sizes.fixPadding }]}
                 >
                     <Text style={{ ...Fonts.blackColor19Medium }}>
                         Continue Shopping

@@ -457,7 +457,7 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     checkboxSelected: {
-        backgroundColor: Colors.blackColor,
-        borderColor: Colors.blackColor,
+        backgroundColor: Colors.primaryColor,
+        borderColor: Colors.primaryColor,
     },
 })

@@ -179,7 +179,7 @@ export default NotificationsScreen
 
 const styles = StyleSheet.create({
     rowBack: {
-        backgroundColor: Colors.blackColor,
+        backgroundColor: Colors.primaryColor,
         flex: 1,
         marginBottom: Sizes.fixPadding * 2.0,
     },
@@ -187,7 +187,7 @@ const styles = StyleSheet.create({
         width: 50.0,
         height: 50.0,
         borderRadius: 25.0,
-        backgroundColor: Colors.blackColor,
+        backgroundColor: Colors.primaryColor,
         alignItems: 'center',
         justifyContent: 'center'
     },

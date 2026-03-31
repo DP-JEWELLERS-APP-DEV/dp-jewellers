@@ -11,23 +11,10 @@ const SplashScreen = () => {
     const navigation = useNavigation();
 
     useEffect(() => {
-        let unsubscribe = null;
-        const timer = setTimeout(() => {
-            unsubscribe = onAuthStateChanged(auth, (user) => {
-                navigation.replace('(tabs)')
-                // if (user) {
-                //     navigation.replace('(tabs)')
-                // } else {
-                //     navigation.replace('auth/loginScreen')
-                // }
-            })
-        }, 800);
-        return () => {
-            clearTimeout(timer);
-            if (unsubscribe) {
-                unsubscribe();
-            }
-        }
+        const unsubscribe = onAuthStateChanged(auth, () => {
+            navigation.replace('(tabs)')
+        });
+        return () => unsubscribe();
     }, [])
 
     return (

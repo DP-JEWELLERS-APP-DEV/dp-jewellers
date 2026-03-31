@@ -27,8 +27,15 @@ export const HomeScreenShimmer = () => (
         {/* 1. Search bar */}
         <Shimmer style={styles.homeSearchBar} />
 
-        {/* 2. Banner — full-width card */}
-        <Shimmer style={styles.homeBanner} />
+        {/* 2. Banner — slider viewport + centered card + pagination dots */}
+        <View style={styles.homeBannerViewport}>
+            <Shimmer style={styles.homeBanner} />
+            <View style={styles.homeBannerDotsRow}>
+                <View style={[styles.homeBannerDot, styles.homeBannerDotActive]} />
+                <View style={styles.homeBannerDot} />
+                <View style={styles.homeBannerDot} />
+            </View>
+        </View>
 
         {/* 3. Category row — horizontal scroll of square tiles with label */}
         <View style={styles.homeCategoryRow}>
@@ -161,7 +168,11 @@ export const ProfileScreenShimmer = () => (
             <Shimmer style={{ ...styles.textLineShort, marginTop: 6 }} />
         </View>
         {[1, 2, 3, 4, 5].map(i => (
-            <Shimmer key={i} style={styles.profileRow} />
+            <View key={i} style={styles.profileRow}>
+                <Shimmer style={styles.profileRowIcon} />
+                <Shimmer style={styles.profileRowText} />
+                <Shimmer style={styles.profileRowChevron} />
+            </View>
         ))}
     </View>
 );
@@ -197,8 +208,22 @@ export const CategoryProductsShimmer = FavoriteScreenShimmer;
 
 export const MetalRatesShimmer = () => (
     <View style={{ flex: 1, backgroundColor: Colors.whiteColor, paddingHorizontal: Sizes.fixPadding * 2.0, paddingTop: Sizes.fixPadding * 2.0 }}>
-        <Shimmer style={{ height: 22, width: '70%', borderRadius: 6, marginBottom: Sizes.fixPadding * 2.0 }} />
-        <Shimmer style={{ height: 280, borderRadius: Sizes.fixPadding, marginBottom: Sizes.fixPadding }} />
+        <View style={styles.metalCard}>
+            <Shimmer style={styles.metalCardHeader} />
+            {[1, 2, 3].map((section) => (
+                <View key={section} style={styles.metalSection}>
+                    <Shimmer style={styles.metalSectionTitle} />
+                    <View style={styles.metalSectionBody}>
+                        {[1, 2, 3].map((row) => (
+                            <View key={row} style={styles.metalRateRow}>
+                                <Shimmer style={styles.metalRateLabel} />
+                                <Shimmer style={styles.metalRateValue} />
+                            </View>
+                        ))}
+                    </View>
+                </View>
+            ))}
+        </View>
     </View>
 );
 
@@ -253,11 +278,33 @@ const styles = StyleSheet.create({
         height: 46,
         borderRadius: 30,
     },
-    homeBanner: {
-        marginHorizontal: Sizes.fixPadding * 2.0,
+    homeBannerViewport: {
+        width: Screen.width,
         height: 290,
-        borderRadius: Sizes.fixPadding,
+        alignItems: 'center',
         marginBottom: Sizes.fixPadding,
+    },
+    homeBanner: {
+        height: 290,
+        width: Screen.width - 40,
+        borderRadius: Sizes.fixPadding,
+    },
+    homeBannerDotsRow: {
+        position: 'absolute',
+        bottom: 10,
+        flexDirection: 'row',
+        alignSelf: 'center',
+    },
+    homeBannerDot: {
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+        backgroundColor: 'rgba(160, 160, 160, 0.45)',
+        marginHorizontal: 4,
+    },
+    homeBannerDotActive: {
+        width: 20,
+        backgroundColor: 'rgba(120, 120, 120, 0.75)',
     },
     homeCategoryRow: {
         flexDirection: 'row',
@@ -447,12 +494,74 @@ const styles = StyleSheet.create({
         borderRadius: 40,
     },
     profileRow: {
-        height: 54,
+        height: 56,
         borderWidth: 1,
         borderColor: Colors.offWhiteColor,
         borderRadius: Sizes.fixPadding,
         marginHorizontal: Sizes.fixPadding * 2.0,
         marginBottom: Sizes.fixPadding + 6,
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: Sizes.fixPadding + 5,
+    },
+    profileRowIcon: {
+        width: 24,
+        height: 24,
+        borderRadius: 6,
+    },
+    profileRowText: {
+        flex: 1,
+        height: 14,
+        marginLeft: Sizes.fixPadding + 5,
+        borderRadius: 6,
+    },
+    profileRowChevron: {
+        width: 16,
+        height: 16,
+        borderRadius: 8,
+    },
+    // Metal rates
+    metalCard: {
+        borderRadius: Sizes.fixPadding,
+        borderWidth: 1,
+        borderColor: Colors.offWhiteColor,
+        paddingBottom: Sizes.fixPadding,
+    },
+    metalCardHeader: {
+        height: 56,
+        margin: Sizes.fixPadding * 2.0,
+        borderRadius: 8,
+    },
+    metalSection: {
+        paddingHorizontal: Sizes.fixPadding * 2.0,
+        paddingTop: Sizes.fixPadding * 2.0,
+    },
+    metalSectionTitle: {
+        height: 16,
+        width: '55%',
+        borderRadius: 6,
+        marginBottom: Sizes.fixPadding,
+    },
+    metalSectionBody: {
+        backgroundColor: Colors.offWhiteColor,
+        borderRadius: Sizes.fixPadding - 4.0,
+        paddingHorizontal: Sizes.fixPadding,
+    },
+    metalRateRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingVertical: Sizes.fixPadding,
+    },
+    metalRateLabel: {
+        height: 12,
+        width: '44%',
+        borderRadius: 6,
+    },
+    metalRateValue: {
+        height: 12,
+        width: '26%',
+        borderRadius: 6,
     },
     // Delivery & order summary
     optionCard: {

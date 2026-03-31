@@ -272,7 +272,7 @@ const styles = StyleSheet.create({
         marginBottom: Sizes.fixPadding + 5.0,
     },
     storeCardSelected: {
-        borderColor: Colors.blackColor,
+        borderColor: Colors.primaryColor,
         backgroundColor: Colors.offWhiteColor,
     },
     primaryBadge: {
@@ -291,8 +291,8 @@ const styles = StyleSheet.create({
         marginRight: Sizes.fixPadding,
     },
     dateCardSelected: {
-        borderColor: Colors.blackColor,
-        backgroundColor: Colors.blackColor,
+        borderColor: Colors.primaryColor,
+        backgroundColor: Colors.primaryColor,
     },
     dayText: {
         ...Fonts.grayColor12Regular,
@@ -318,13 +318,13 @@ const styles = StyleSheet.create({
         marginLeft: Sizes.fixPadding,
     },
     radioOuterSelected: {
-        borderColor: Colors.blackColor,
+        borderColor: Colors.primaryColor,
     },
     radioInner: {
         width: 12,
         height: 12,
         borderRadius: 6,
-        backgroundColor: Colors.blackColor,
+        backgroundColor: Colors.primaryColor,
     },
     infoCard: {
         flexDirection: 'row',

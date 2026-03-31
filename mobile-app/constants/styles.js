@@ -1,7 +1,7 @@
 import { Dimensions } from 'react-native'
 
 export const Colors = {
-    primaryColor: '#0B1F5A',
+    primaryColor: '#1E1B4B',
     whiteColor: '#FFFDF4',
     offWhiteColor: '#F4EEDC',
     blackColor: '#1C1F32',
@@ -236,7 +236,7 @@ export const CommomStyles = {
         marginRight: Sizes.fixPadding,
     },
     buttonStyle: {
-        backgroundColor: Colors.blackColor,
+        backgroundColor: Colors.primaryColor,
         marginHorizontal: Sizes.fixPadding * 2.0,
         marginBottom: Sizes.fixPadding * 2.0,
         alignItems: 'center',

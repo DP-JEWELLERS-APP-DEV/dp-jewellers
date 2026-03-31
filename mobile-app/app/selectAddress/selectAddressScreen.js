@@ -297,7 +297,7 @@ const styles = StyleSheet.create({
     },
     addressActionButton: {
         borderWidth: 1.0,
-        borderColor: Colors.blackColor,
+        borderColor: Colors.primaryColor,
         borderRadius: Sizes.fixPadding - 2.0,
         paddingHorizontal: Sizes.fixPadding + 5.0,
         paddingVertical: Sizes.fixPadding - 6.0,

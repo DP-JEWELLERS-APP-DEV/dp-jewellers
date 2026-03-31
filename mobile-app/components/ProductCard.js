@@ -78,6 +78,7 @@ const ProductCard = ({
     };
 
     const cardStyle = horizontal ? styles.horizontalCard : styles.verticalCard;
+    const imageContainerStyle = horizontal ? styles.horizontalImageContainer : styles.verticalImageContainer;
 
     return (
         <TouchableOpacity
@@ -86,7 +87,7 @@ const ProductCard = ({
             style={[cardStyle, style]}
         >
             {/* Product Image */}
-            <View style={styles.imageContainer}>
+            <View style={imageContainerStyle}>
                 <Image
                     source={item.image ? { uri: item.image } : placeholderImage}
                     style={horizontal ? styles.horizontalImage : styles.verticalImage}
@@ -116,7 +117,7 @@ const ProductCard = ({
 
             {/* Product Info */}
             < View style={styles.infoContainer} >
-                <Text numberOfLines={1} style={styles.productName}>
+                <Text numberOfLines={2} style={styles.productName}>
                     {item.name}
                 </Text>
                 <View style={styles.priceRow}>
@@ -153,30 +154,51 @@ export default ProductCard;
 
 const styles = StyleSheet.create({
     verticalCard: {
-        borderColor: Colors.offWhiteColor,
+        borderColor: '#EEE2CC',
         borderWidth: 1.0,
-        borderRadius: Sizes.fixPadding,
-        marginHorizontal: Sizes.fixPadding,
-        maxWidth: (Screen.width / 2.0) - 30,
+        borderRadius: Sizes.fixPadding + 2.0,
+        marginHorizontal: Sizes.fixPadding - 2.0,
+        maxWidth: (Screen.width / 2.0) - 24,
         flex: 1,
-        marginBottom: Sizes.fixPadding * 2.0,
+        marginBottom: Sizes.fixPadding + 8.0,
         backgroundColor: Colors.whiteColor,
+        overflow: 'hidden',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.06,
+        shadowRadius: 8,
+        elevation: 2,
     },
     horizontalCard: {
-        borderColor: Colors.offWhiteColor,
+        borderColor: '#EEE2CC',
         borderWidth: 1.0,
-        borderRadius: Sizes.fixPadding,
-        marginHorizontal: Sizes.fixPadding,
-        width: Screen.width / 2.4,
+        borderRadius: Sizes.fixPadding + 2.0,
+        marginHorizontal: Sizes.fixPadding - 3.0,
+        width: Screen.width * 0.43,
         backgroundColor: Colors.whiteColor,
+        overflow: 'hidden',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.06,
+        shadowRadius: 8,
+        elevation: 2,
+        minHeight: 262,
     },
-    imageContainer: {
+    verticalImageContainer: {
         position: 'relative',
         width: '100%',
-        height: (Screen.width / 3.5) + (Sizes.fixPadding + 5.0) * 2,
+        aspectRatio: 1,
         overflow: 'hidden',
-        borderTopLeftRadius: Sizes.fixPadding,
-        borderTopRightRadius: Sizes.fixPadding,
+        borderTopLeftRadius: Sizes.fixPadding + 2.0,
+        borderTopRightRadius: Sizes.fixPadding + 2.0,
+    },
+    horizontalImageContainer: {
+        position: 'relative',
+        width: '100%',
+        aspectRatio: 1,
+        overflow: 'hidden',
+        borderTopLeftRadius: Sizes.fixPadding + 2.0,
+        borderTopRightRadius: Sizes.fixPadding + 2.0,
     },
     verticalImage: {
         width: '100%',
@@ -192,10 +214,10 @@ const styles = StyleSheet.create({
         position: 'absolute',
         top: Sizes.fixPadding - 2,
         right: Sizes.fixPadding - 2,
-        backgroundColor: Colors.whiteColor,
-        borderRadius: 15,
-        width: 30,
-        height: 30,
+        backgroundColor: 'rgba(255,253,244,0.95)',
+        borderRadius: 16,
+        width: 32,
+        height: 32,
         alignItems: 'center',
         justifyContent: 'center',
         elevation: 2,
@@ -205,15 +227,18 @@ const styles = StyleSheet.create({
         shadowRadius: 2,
     },
     divider: {
-        backgroundColor: Colors.offWhiteColor,
+        backgroundColor: '#F1E8D8',
         height: 1.0,
     },
     infoContainer: {
-        padding: Sizes.fixPadding,
+        paddingHorizontal: Sizes.fixPadding,
+        paddingVertical: Sizes.fixPadding - 1,
+        minHeight: 100,
     },
     productName: {
-        ...Fonts.blackColor16Regular,
-        lineHeight: 20.0,
+        ...Fonts.blackColor15Medium,
+        lineHeight: 18.0,
+        minHeight: 40,
     },
     priceRow: {
         flexDirection: 'row',
@@ -224,18 +249,20 @@ const styles = StyleSheet.create({
     productPrice: {
         ...Fonts.blackColor16SemiBold,
         flex: 1,
+        color: '#111111',
     },
     addToCartButton: {
         backgroundColor: Colors.primaryColor,
-        borderRadius: Sizes.fixPadding - 5,
-        width: 28,
-        height: 28,
+        borderRadius: 10,
+        width: 30,
+        height: 30,
         alignItems: 'center',
         justifyContent: 'center',
     },
     categoryText: {
-        ...Fonts.grayColor14Regular,
-        marginTop: 2,
+        ...Fonts.grayColor13Medium,
+        marginTop: 3,
+        minHeight: 20,
     },
     newBadge: {
         position: 'absolute',

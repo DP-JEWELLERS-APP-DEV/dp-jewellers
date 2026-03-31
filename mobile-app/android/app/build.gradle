@@ -98,8 +98,8 @@ android {
         applicationId 'com.render.rnexpo_jewelleryempire'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 5
-        versionName "1.0.4"
+        versionCode 8
+        versionName "1.0.7"
 
         buildConfigField "String", "REACT_NATIVE_RELEASE_LEVEL", "\"${findProperty('reactNativeReleaseLevel') ?: 'stable'}\""
     }
@@ -159,6 +159,13 @@ android {
         options.each {
             android.packagingOptions[prop] += it
         }
+    }
+}
+
+configurations.configureEach {
+    resolutionStrategy {
+        // Newer checkout SDK improves large-screen behavior; RN wrapper still pins 1.7.1.
+        force 'com.razorpay:standard-core:1.7.10'
     }
 }
 

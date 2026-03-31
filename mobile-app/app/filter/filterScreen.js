@@ -151,7 +151,7 @@ const FilterScreen = () => {
     function priceRangeFilter() {
         const renderThumb = useCallback(() => <View style={styles.sliderThumbStyle} />, []);
         const renderRail = useCallback(() => <View style={{ backgroundColor: Colors.lightGrayColor, ...styles.sliderStyle }} />, []);
-        const renderRailSelected = useCallback(() => <View style={{ backgroundColor: Colors.blackColor, ...styles.sliderStyle }} />, []);
+        const renderRailSelected = useCallback(() => <View style={{ backgroundColor: Colors.primaryColor, ...styles.sliderStyle }} />, []);
         const renderNotch = useCallback(() => <View />, []);
         const handleValueChange = useCallback((low, high) => {
             setLowRange(low);
@@ -358,8 +358,8 @@ const styles = StyleSheet.create({
         marginBottom: Sizes.fixPadding,
     },
     optionChipSelected: {
-        backgroundColor: Colors.blackColor,
-        borderColor: Colors.blackColor,
+        backgroundColor: Colors.primaryColor,
+        borderColor: Colors.primaryColor,
     },
     optionText: {
         ...Fonts.blackColor15Regular,
@@ -382,7 +382,7 @@ const styles = StyleSheet.create({
         width: 17.0,
         height: 17.0,
         borderRadius: 8.5,
-        backgroundColor: Colors.blackColor
+        backgroundColor: Colors.primaryColor
     },
     sliderStyle: {
         borderRadius: Sizes.fixPadding,
@@ -405,7 +405,7 @@ const styles = StyleSheet.create({
         flex: 0.4,
         alignItems: 'center',
         justifyContent: 'center',
-        borderColor: Colors.blackColor,
+        borderColor: Colors.primaryColor,
         borderWidth: 1,
         borderRadius: Sizes.fixPadding,
         paddingVertical: Sizes.fixPadding + 2,
@@ -415,7 +415,7 @@ const styles = StyleSheet.create({
         flex: 0.6,
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: Colors.blackColor,
+        backgroundColor: Colors.primaryColor,
         borderRadius: Sizes.fixPadding,
         paddingVertical: Sizes.fixPadding + 2,
     },

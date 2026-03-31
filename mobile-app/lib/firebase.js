@@ -26,7 +26,11 @@ try {
   auth = getAuth(app);
 }
 
-const db = getFirestore(app);
 const functions = getFunctions(app, 'asia-south1');
 
-export { app, auth, db, functions, firebaseConfig };
+/** Lazy Firestore — avoids init on cold start (nothing imported `db` yet). */
+export function getDb() {
+  return getFirestore(app);
+}
+
+export { app, auth, functions, firebaseConfig };
